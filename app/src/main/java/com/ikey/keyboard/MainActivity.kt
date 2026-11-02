@@ -22,7 +22,7 @@ class MainActivity : Activity() {
         fun label(s: String, size: Float) = TextView(this).apply { text=s; textSize=size; setTextColor(Color.rgb(30,30,35)); setPadding(0,12,0,12) }
         fun button(s: String, action: () -> Unit) = Button(this).apply { text=s; setOnClickListener { action() } }
         layout.addView(label("iKey Keyboard", 30f))
-        layout.addView(label("Phase 2 • Smart Touch Keyboard", 16f))
+        layout.addView(label("Phase 3 • Swipe-to-Type Keyboard", 16f))
         layout.addView(label("1. Enable iKey in Android keyboard settings.\n2. Select iKey as your keyboard.\n3. Test typing below.", 15f))
         layout.addView(button("1  ENABLE KEYBOARD") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
         layout.addView(button("2  SELECT KEYBOARD") { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() })
@@ -33,6 +33,12 @@ class MainActivity : Activity() {
         }
         layout.addView(dark)
 
+        layout.addView(Switch(this).apply {
+            text="Enable swipe-to-type"; textSize=16f
+            isChecked=prefs.getBoolean("swipe_enabled",true)
+            setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("swipe_enabled",checked).apply() }
+        })
+        layout.addView(label("Swipe across letters to enter common English and Filipino words. The starter dictionary is limited and runs offline.", 13f))
         layout.addView(label("Touch detection mode", 18f))
         val modes = arrayOf("Classic","Smart","Adaptive")
         val spinner = Spinner(this)
@@ -72,7 +78,7 @@ class MainActivity : Activity() {
         layout.addView(label("Touch settings apply when the keyboard next opens. Drag sideways on the spacebar to move the cursor.", 13f))
         layout.addView(label("Try your keyboard:", 17f))
         layout.addView(EditText(this).apply { hint="Tap here and start typing"; minLines=3; gravity=Gravity.TOP; inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE })
-        layout.addView(label("Phase 2: expanded touch zones, adaptive nearest-key selection, touch offset calibration, adjustable sensitivity, and spacebar cursor dragging. Full word-swipe prediction is not included yet.", 13f))
+        layout.addView(label("Phase 3: offline starter swipe recognition with visible gesture trail and swipe toggle. Phase 2 adaptive touch controls remain available. Advanced dictionary and contextual predictions are future work.", 13f))
         setContentView(ScrollView(this).apply { addView(layout) })
     }
 }
