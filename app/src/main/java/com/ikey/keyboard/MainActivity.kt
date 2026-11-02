@@ -113,6 +113,21 @@ class MainActivity : Activity() {
         toggleSetting("Double-space inserts a period","double_space_period",true)
         toggleSetting("Learn words locally (opt-in)","learn_words",false)
         toggleSetting("Save clipboard history locally (opt-in)","clipboard_history_enabled",false)
+        layout.addView(label("Personal dictionary (one word per line)",15f))
+        val dictionaryInput=EditText(this).apply {
+            minLines=2; maxLines=5
+            hint="Add words that should not be autocorrected"
+            setText(prefs.getStringSet("learned_words",emptySet())?.sorted()?.joinToString("\\n") ?: "")
+        }
+        layout.addView(dictionaryInput)
+        layout.addView(button("SAVE PERSONAL DICTIONARY") {
+            val words=dictionaryInput.text.toString().lineSequence()
+                .map { it.trim().lowercase() }
+                .filter { it.length in 2..24 && it.all(Char::isLetter) }
+                .distinct().take(500).toSet()
+            prefs.edit().putStringSet("learned_words",words).apply()
+            Toast.makeText(this,"${words.size} words saved",Toast.LENGTH_SHORT).show()
+        })
         layout.addView(button("CLEAR LEARNED WORDS") {
             prefs.edit().remove("learned_words").apply()
             Toast.makeText(this,"Learned words cleared",Toast.LENGTH_SHORT).show()
