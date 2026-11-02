@@ -22,6 +22,11 @@ class MainActivity : Activity() {
         fun label(s: String, size: Float) = TextView(this).apply { text=s; textSize=size; setTextColor(Color.rgb(30,30,35)); setPadding(0,12,0,12) }
         fun button(s: String, action: () -> Unit) = Button(this).apply { text=s; setOnClickListener { action() } }
         layout.addView(label("iKey Keyboard", 30f))
+        layout.addView(button("✓  APPLY KEYBOARD CHANGES") {
+            prefs.edit().putLong("settings_apply_version",System.currentTimeMillis()).apply()
+            Toast.makeText(this,"Keyboard settings applied",Toast.LENGTH_SHORT).show()
+        })
+        layout.addView(label("Tap Apply after changing settings. If the keyboard is open, it will refresh immediately.",13f))
         layout.addView(label("Enhanced Keyboard • Phase 6+", 16f))
         layout.addView(label("1. Enable iKey in Android keyboard settings.\n2. Select iKey as your keyboard.\n3. Test typing below.", 15f))
         layout.addView(button("1  ENABLE KEYBOARD") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
@@ -68,7 +73,7 @@ class MainActivity : Activity() {
             isChecked=prefs.getBoolean("autocorrect",true)
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("autocorrect",checked).apply() }
         })
-        layout.addView(label("Suggestions are processed offline. Predictions are disabled in password fields. Autocorrect uses a starter English/Tagalog dictionary.",13f))
+        layout.addView(label("Suggestions are processed offline using bundled open-license English and Filipino wordlists. Predictions are disabled in password fields.",13f))
         layout.addView(label("Phase 5: Keyboard layout and shortcuts",18f))
         val handOptions=arrayOf("Off","Left","Right")
         val handSpinner=Spinner(this)
@@ -93,7 +98,7 @@ class MainActivity : Activity() {
             prefs.edit().putString("shortcuts",shortcuts.text.toString().take(4000)).apply()
             Toast.makeText(this,"Shortcuts saved",Toast.LENGTH_SHORT).show()
         })
-        layout.addView(label("Emoji: tap 😊 on the keyboard. Clipboard: tap 📋 then PASTE. Clipboard content is accessed only when requested and is not saved by iKey.",13f))
+        layout.addView(label("Emoji: tap 😊. Clipboard: tap 📋 then PASTE. Clipboard history is stored only if explicitly enabled and saved.",13f))
         layout.addView(label("Phase 6: Comfort and accessibility",18f))
         layout.addView(Switch(this).apply {
             text="Vibration on key press"; textSize=16f
@@ -135,7 +140,7 @@ class MainActivity : Activity() {
         val dictionaryInput=EditText(this).apply {
             minLines=2; maxLines=5
             hint="Add words that should not be autocorrected"
-            setText(prefs.getStringSet("learned_words",emptySet())?.sorted()?.joinToString("\\n") ?: "")
+            setText(prefs.getStringSet("learned_words",emptySet())?.sorted()?.joinToString("\n") ?: "")
         }
         layout.addView(dictionaryInput)
         layout.addView(button("SAVE PERSONAL DICTIONARY") {
