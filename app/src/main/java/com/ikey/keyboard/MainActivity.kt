@@ -39,6 +39,18 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("swipe_enabled",checked).apply() }
         })
         layout.addView(label("Swipe across letters to enter common English and Filipino words. The starter dictionary is limited and runs offline.", 13f))
+        layout.addView(label("Keyboard accent color",15f))
+        val accentOptions=arrayOf("Blue","Purple","Green","Orange","Pink")
+        val accentSpinner=Spinner(this)
+        accentSpinner.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,accentOptions)
+        accentSpinner.setSelection(accentOptions.indexOf(prefs.getString("accent","Blue")).coerceAtLeast(0))
+        accentSpinner.onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent:android.widget.AdapterView<*>?) {}
+            override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:android.view.View?,position:Int,id:Long) {
+                prefs.edit().putString("accent",accentOptions[position]).apply()
+            }
+        }
+        layout.addView(accentSpinner)
         layout.addView(label("Phase 4: Suggestions and autocorrect",18f))
         layout.addView(Switch(this).apply {
             text="Show word suggestions"; textSize=16f
