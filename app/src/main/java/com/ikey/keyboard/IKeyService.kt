@@ -3,6 +3,8 @@ package com.ikey.keyboard
 import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.view.View
+import android.view.WindowManager
+import android.graphics.Color
 import android.view.inputmethod.EditorInfo
 import android.view.KeyEvent
 import android.content.ClipboardManager
@@ -85,6 +87,22 @@ class IKeyService : InputMethodService() {
         if(prefix.isNotBlank() && (!prefs.getBoolean("autocorrect",true) || WordSuggestions.correction(prefix,learned())==null)) rememberWord(prefix)
         ic.commitText(separator,1)
         updateAutoCapitalization()
+    }
+    override fun onCreate() {
+        super.onCreate()
+        // Keep the IME above the system navigation bar instead of drawing behind it.
+        window?.window?.let { w ->
+            w.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION)
+            w.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            w.navigationBarColor=Color.rgb(208,211,219)
+            @Suppress("DEPRECATION")
+            val layoutFlags=View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION or
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
+                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_FULLSCREEN
+            @Suppress("DEPRECATION")
+            w.decorView.systemUiVisibility=w.decorView.systemUiVisibility and layoutFlags.inv()
+        }
     }
     override fun onCreateInputView(): View {
         keyboard = IKeyView(this) { key -> handle(key) }
