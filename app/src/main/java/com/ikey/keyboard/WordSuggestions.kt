@@ -107,6 +107,9 @@ maayos mabuti mabuhay paalam kita tayo ulit mamaya bukas
 """).trim().split(Regex("\\s+")).distinct()
     val vocabulary:List<String> by lazy { (words+extraWords).distinct() }
     private val byInitial by lazy { vocabulary.groupBy { it.firstOrNull() } }
+    private val correctionCache=object:LinkedHashMap<String,String?>(256,0.75f,true) {
+        override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,String?>?):Boolean = size>256
+    }
     private val next = mapOf(
         "good" to listOf("morning","night","afternoon"),
         "thank" to listOf("you","you","you"),
@@ -143,11 +146,14 @@ maayos mabuti mabuhay paalam kita tayo ulit mamaya bukas
     fun correction(word:String, learned:Collection<String> = emptyList()):String? {
         val p=word.lowercase()
         if(p.length<3 || p in vocabulary || p in learned) return null
-        return (learned+vocabulary).asSequence()
+        if(learned.isEmpty() && correctionCache.containsKey(p)) return correctionCache[p]
+        val result=(learned+byInitial[p.firstOrNull()].orEmpty()).asSequence()
             .filter { it.length>=2 && kotlin.math.abs(it.length-p.length)<=1 && it.firstOrNull()==p.firstOrNull() }
             .map { it to distance(p,it) }
             .filter { it.second==1 }
             .minWithOrNull(compareBy<Pair<String,Int>> { it.second }.thenBy { kotlin.math.abs(it.first.length-p.length) })
             ?.first
+        if(learned.isEmpty()) correctionCache[p]=result
+        return result
     }
 }
