@@ -36,7 +36,7 @@ class IKeyService : InputMethodService() {
     private fun updateAutoCapitalization() {
         if(!prefs.getBoolean("auto_caps",true) || numeric || symbols) return
         val before=currentInputConnection?.getTextBeforeCursor(100,0)?.toString().orEmpty()
-        if(before.isBlank() || before.trimEnd().lastOrNull() in listOf('.','!','?','\\n')) {
+        if(before.isBlank() || before.trimEnd().lastOrNull() in listOf('.','!','?',10.toChar())) {
             if(!shifted && !caps) { shifted=true; refresh() }
         }
     }
