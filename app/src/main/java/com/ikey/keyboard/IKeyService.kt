@@ -19,6 +19,15 @@ class IKeyService : InputMethodService() {
     private var suggestionsAllowed = true
     private var lastSwipeWord:String? = null
     private val prefs by lazy { getSharedPreferences("ikey", MODE_PRIVATE) }
+    private val settingsListener=android.content.SharedPreferences.OnSharedPreferenceChangeListener { _,key ->
+        if(key=="settings_apply_version") {
+            keyboard?.showLetters()
+            refresh()
+            keyboard?.requestLayout()
+            keyboard?.invalidate()
+            updateSuggestions()
+        }
+    }
     private fun learned():Set<String> = prefs.getStringSet("learned_words",emptySet()) ?: emptySet()
     private fun rememberWord(word:String) {
         if(!prefs.getBoolean("learn_words",false) || !suggestionsAllowed) return
@@ -94,6 +103,7 @@ class IKeyService : InputMethodService() {
     }
     override fun onCreate() {
         super.onCreate()
+        prefs.registerOnSharedPreferenceChangeListener(settingsListener)
         try { WordSuggestions.initialize(this) } catch(e:Exception) {
             android.util.Log.e("iKeyboard","Dictionary initialization failed; using built-in words",e)
         }
@@ -110,6 +120,10 @@ class IKeyService : InputMethodService() {
             @Suppress("DEPRECATION")
             w.decorView.systemUiVisibility=w.decorView.systemUiVisibility and layoutFlags.inv()
         }
+    }
+    override fun onDestroy() {
+        prefs.unregisterOnSharedPreferenceChangeListener(settingsListener)
+        super.onDestroy()
     }
     override fun onCreateInputView(): View {
         keyboard = IKeyView(this) { key ->
