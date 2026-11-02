@@ -40,7 +40,11 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private val extraEmojis = listOf("😃","😄","😆","😋","😛","😜","🤪","🤗","🤩","🥳","😌","😔","😢","😤","😠","🤬","😱","😨","😰","😳","🤯","🤒","🤕","🤢","🤮","😷","🤠","🥸","😈","👻","💀","👽","🤖","😺","😻","🙈","🙉","🙊","💋","💌","💘","💖","💝","💞","💓","💗","💟","💔","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💐","🌹","🌷","🌻","🌺","🌸","🌼","🌈","☀️","🌙","⭐","🌟","⚡","☁️","🌧️","❄️","🌊","🌴","🌲","🌿","🍀","🍎","🍌","🍉","🍇","🍓","🍒","🍍","🥭","🥑","🍕","🍟","🍗","🍜","🍣","🍩","🍰","🍦","🥤","🍺","🏀","⚽","🏆","🎮","🎧","🎵","🎶","🎤","🎬","📱","💻","⌚","🚗","✈️","🚀","🏠","🏢","🎁","💰","💵","📌","📍","✅","❌","⚠️","❗","❓","💬","💭","🫶","🤌","🤞","✌️","🤟","👌","👊","✊","🫰","🖐️","👀","🧠","💃","🕺","🏃","🚶","👨","👩","👶","👨‍👩‍👧","🇺🇸","🇬🇧","🇯🇵","🇰🇷")
     private val allEmojis by lazy { (emojis+extraEmojis).distinct() }
     private var suggestions: List<String> = emptyList()
-    private val barHeight = 39f * resources.displayMetrics.density
+    private val resizeHandleHeight = 16f * resources.displayMetrics.density
+    private val barHeight = 55f * resources.displayMetrics.density
+    private var resizing = false
+    private var resizeStartY = 0f
+    private var resizeStartHeight = 53
     fun setSuggestions(items:List<String>) { suggestions=items.take(3); invalidate() }
     private var pressed: Key? = null
     private val prefs = context.getSharedPreferences("ikey", Context.MODE_PRIVATE)
@@ -56,7 +60,10 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private fun swipeEnabled() = prefs.getBoolean("swipe_enabled",true)
     private fun addSwipePoint(x:Float,y:Float) {
         if(swipePoints.size<600) swipePoints.add(PointF(x,y))
-        val hit=keys.firstOrNull { it.rect.contains(x,y) }?.text ?: smartHit(x,y)?.text
+        val hit=keys.firstOrNull { it.rect.contains(x,y) }?.text
+            ?: keys.filter { it.text.length==1 && it.text[0] in 'a'..'z' }
+                .minByOrNull { hypot(it.rect.centerX()-x,it.rect.centerY()-y) }
+                ?.takeIf { hypot(it.rect.centerX()-x,it.rect.centerY()-y)<rowHeight*0.78f }?.text
         if(hit!=null && hit.length==1 && hit[0] in 'a'..'z' &&
             (swipeLetters.isEmpty() || swipeLetters.last().toString()!=hit)) swipeLetters.append(hit)
     }
@@ -78,7 +85,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     }
 
     private val density = resources.displayMetrics.density
-    private val rowHeight get() = prefs.getInt("key_height",53).coerceIn(42,72)*density
+    private val rowHeight get() = prefs.getInt("key_height",53).coerceIn(38,90)*density
     private val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var longPressTriggered = false
     private val longPressTask = Runnable {
@@ -156,11 +163,15 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         c.drawColor(if(dark) Color.rgb(42,44,49) else Color.rgb(208,211,219))
         paint.color=if(dark) Color.rgb(48,50,55) else Color.rgb(224,227,234)
         c.drawRect(0f,0f,width.toFloat(),barHeight,paint)
+        paint.color=if(dark) Color.LTGRAY else Color.DKGRAY
+        c.drawRoundRect(RectF(width/2f-23f*density,5f*density,width/2f+23f*density,10f*density),4f*density,4f*density,paint)
+        c.save()
+        c.translate(0f,resizeHandleHeight)
         if(clipboardMode) {
             paint.color=if(dark) Color.WHITE else Color.BLACK
             paint.textSize=13f*density
             paint.textAlign=Paint.Align.CENTER
-            c.drawText("Clipboard: "+clipboardPreview.take(32),width/2f,barHeight/2f-(paint.ascent()+paint.descent())/2f,paint)
+            c.drawText("Clipboard: "+clipboardPreview.take(32),width/2f,(barHeight-resizeHandleHeight)/2f-(paint.ascent()+paint.descent())/2f,paint)
         } else if(suggestions.isNotEmpty()) {
             suggestions.forEachIndexed { index, word ->
                 val left=index*width/3f
@@ -168,13 +179,14 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 paint.textAlign=Paint.Align.CENTER
                 paint.typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)
                 paint.textSize=15f*density
-                c.drawText(word,left+width/6f,barHeight/2f-(paint.ascent()+paint.descent())/2f,paint)
+                c.drawText(word,left+width/6f,(barHeight-resizeHandleHeight)/2f-(paint.ascent()+paint.descent())/2f,paint)
                 if(index<2) {
                     paint.color=if(dark) Color.DKGRAY else Color.LTGRAY
                     c.drawRect((index+1)*width/3f-0.5f*density,7f*density,(index+1)*width/3f+0.5f*density,barHeight-7f*density,paint)
                 }
             }
         }
+        c.restore()
         keys.forEach { key ->
             val special=key.text in listOf("⇧","⌫","?123","ABC","↵","🌐","◀","▶","PASTE","SAVE","DELETE CLIP","CLEAR ALL")
             val color=when {
@@ -233,6 +245,11 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     override fun onTouchEvent(event:MotionEvent):Boolean {
         when(event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                if(event.y<resizeHandleHeight) {
+                    resizing=true; resizeStartY=event.rawY
+                    resizeStartHeight=prefs.getInt("key_height",53).coerceIn(38,90)
+                    cancelPendingLongPress(); return true
+                }
                 downX=event.x; downY=event.y; previousSwipeX=event.x; previousSwipeY=event.y; spaceDrag=false; cursorSteps=0
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
                 if(swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode) addSwipePoint(event.x,event.y)
@@ -244,6 +261,14 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_MOVE -> {
+                if(resizing) {
+                    val next=(resizeStartHeight+((resizeStartY-event.rawY)/density/4f).toInt()).coerceIn(38,90)
+                    if(next!=prefs.getInt("key_height",53)) {
+                        prefs.edit().putInt("key_height",next).apply()
+                        requestLayout(); rebuild(width); invalidate()
+                    }
+                    return true
+                }
                 if(hypot(event.x-downX,event.y-downY)>12f*density) cancelPendingLongPress()
                 if(longPressTriggered) return true
                 if(downKey?.text=="space" && abs(event.x-downX)>14f*density) {
@@ -279,6 +304,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_UP -> {
+                if(resizing) { resizing=false; performClick(); return true }
                 cancelPendingLongPress()
                 if(longPressTriggered) {
                     longPressTriggered=false; pressed=null; invalidate(); performClick(); return true
@@ -290,6 +316,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     swipeActive=false; swipePoints.clear(); swipeLetters.clear(); pressed=null
                     invalidate()
                     if(decoded!=null) { onKey("SWIPE_WORD:"+decoded); if(alternatives.size>1) setSuggestions(alternatives) }
+                    else if(swipeLetters.isNotEmpty()) onKey("SWIPE_WORD:"+swipeLetters.toString())
                     performClick()
                     return true
                 }
@@ -315,7 +342,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { resizing=false; cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
         }
         return true
     }
