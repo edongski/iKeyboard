@@ -125,7 +125,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123","😊","📋","🌐","space",".","↵"))
         rows.forEachIndexed { row, items ->
             val weights=items.map { when(it) { "space"->4.0f; "⇧","⌫","?123","ABC","↵","PASTE","CLEAR"->1.45f; "🌐","😊","📋"->1.1f; else->1f } }
-            val total=weights.sum()
+            val total=weights.sum().coerceAtLeast(1f)
             val hand=prefs.getString("one_hand","Off") ?: "Off"
             val scale=if(hand=="Off") 1f else 0.78f
             val usable=(w-2*margin)*scale
@@ -168,7 +168,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             }
         }
         keys.forEach { key ->
-            val special=key.text in listOf("⇧","⌫","?123","ABC","↵","🌐")
+            val special=key.text in listOf("⇧","⌫","?123","ABC","↵","🌐","◀","▶","PASTE","SAVE","DELETE CLIP","CLEAR ALL")
             val color=when {
                 pressed===key -> accent()
                 dark && special -> Color.rgb(85,88,95)
@@ -186,7 +186,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 23)*density
             val text=if(clipboardMode && key.text.startsWith("CLIP:")) {
                 val index=key.text.substringAfter(":").toIntOrNull() ?: -1
-                clipboardItems.getOrNull(index)?.replace("\\n"," ")?.take(12) ?: "—"
+                clipboardItems.getOrNull(index)?.replace("\n"," ")?.take(12) ?: "—"
             } else if(shift && !symbols && !emojiMode && !clipboardMode) key.text.uppercase() else key.text
             val cy=key.rect.centerY()-(paint.ascent()+paint.descent())/2
             c.drawText(text,key.rect.centerX(),cy,paint)
@@ -217,7 +217,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             MotionEvent.ACTION_DOWN -> {
                 downX=event.x; downY=event.y; spaceDrag=false; cursorSteps=0
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
-                if(swipeEnabled() && !symbols && !numeric) addSwipePoint(event.x,event.y)
+                if(swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
                 downKey=pressed
                 longPressTriggered=false
@@ -238,6 +238,10 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 } else if(!spaceDrag && swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode &&
                     downKey?.text?.length==1 && downKey?.text?.firstOrNull() in 'a'..'z' &&
                     hypot(event.x-downX,event.y-downY)>22f*density) {
+                    if(!swipeActive) {
+                        swipeLetters.clear()
+                        downKey?.text?.let { swipeLetters.append(it) }
+                    }
                     swipeActive=true
                     for(i in 0 until event.historySize) addSwipePoint(event.getHistoricalX(i),event.getHistoricalY(i))
                     addSwipePoint(event.x,event.y)
