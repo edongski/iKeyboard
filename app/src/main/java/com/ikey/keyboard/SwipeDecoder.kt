@@ -46,6 +46,18 @@ bahay trabaho pera pamilya kaibigan mahal kita miss na kita mamaya sandali ngayo
         }
         return prev[b.length]
     }
+    fun alternatives(raw:String, learned:Collection<String> = emptyList()):List<String> {
+        val path=compact(raw)
+        if(path.length<2) return emptyList()
+        return (learned+words).asSequence().distinct().filter {
+            val candidate=compact(it)
+            candidate.isNotEmpty() && candidate.first()==path.first() &&
+            candidate.last()==path.last() && abs(candidate.length-path.length)<=4
+        }.map { it to distance(path,compact(it)) }
+         .filter { it.second<=maxOf(2,path.length/3) }
+         .sortedWith(compareBy<Pair<String,Int>> { it.second }.thenBy { abs(it.first.length-path.length) })
+         .map { it.first }.take(3).toList()
+    }
     fun decode(raw:String):String? {
         val path=compact(raw)
         if(path.length<2) return null
