@@ -51,10 +51,12 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private val swipePoints = mutableListOf<PointF>()
     private val swipeLetters = StringBuilder()
     private var swipeActive = false
+    private var previousSwipeX=0f
+    private var previousSwipeY=0f
     private fun swipeEnabled() = prefs.getBoolean("swipe_enabled",true)
     private fun addSwipePoint(x:Float,y:Float) {
         if(swipePoints.size<600) swipePoints.add(PointF(x,y))
-        val hit=smartHit(x,y)?.text
+        val hit=keys.firstOrNull { it.rect.contains(x,y) }?.text ?: smartHit(x,y)?.text
         if(hit!=null && hit.length==1 && hit[0] in 'a'..'z' &&
             (swipeLetters.isEmpty() || swipeLetters.last().toString()!=hit)) swipeLetters.append(hit)
     }
@@ -215,7 +217,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     override fun onTouchEvent(event:MotionEvent):Boolean {
         when(event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                downX=event.x; downY=event.y; spaceDrag=false; cursorSteps=0
+                downX=event.x; downY=event.y; previousSwipeX=event.x; previousSwipeY=event.y; spaceDrag=false; cursorSteps=0
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
                 if(swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
@@ -228,7 +230,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             MotionEvent.ACTION_MOVE -> {
                 if(hypot(event.x-downX,event.y-downY)>12f*density) cancelPendingLongPress()
                 if(longPressTriggered) return true
-                if(pressed?.text=="space" && abs(event.x-downX)>14f*density) {
+                if(downKey?.text=="space" && abs(event.x-downX)>14f*density) {
                     spaceDrag=true
                     val target=((event.x-downX)/(23f*density)).toInt()
                     val delta=(target-cursorSteps).coerceIn(-20,20)
@@ -241,10 +243,20 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     if(!swipeActive) {
                         swipeLetters.clear()
                         downKey?.text?.let { swipeLetters.append(it) }
+                        previousSwipeX=downX; previousSwipeY=downY
                     }
                     swipeActive=true
-                    for(i in 0 until event.historySize) addSwipePoint(event.getHistoricalX(i),event.getHistoricalY(i))
-                    addSwipePoint(event.x,event.y)
+                    fun interpolate(x:Float,y:Float) {
+                        val distance=hypot(x-previousSwipeX,y-previousSwipeY)
+                        val steps=(distance/(9f*density)).toInt().coerceIn(1,50)
+                        for(step in 1..steps) {
+                            val ratio=step.toFloat()/steps
+                            addSwipePoint(previousSwipeX+(x-previousSwipeX)*ratio,previousSwipeY+(y-previousSwipeY)*ratio)
+                        }
+                        previousSwipeX=x; previousSwipeY=y
+                    }
+                    for(i in 0 until event.historySize) interpolate(event.getHistoricalX(i),event.getHistoricalY(i))
+                    interpolate(event.x,event.y)
                 } else if(!spaceDrag && hypot(event.x-downX,event.y-downY)>18f*density) {
                     pressed=smartHit(event.x,event.y) ?: pressed
                 }
