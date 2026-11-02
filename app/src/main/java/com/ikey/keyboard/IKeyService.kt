@@ -229,11 +229,11 @@ class IKeyService : InputMethodService() {
             updateSuggestions()
             return
         }
-        if (key.startsWith("CURSOR_LEFT:") || key.startsWith("CURSOR_RIGHT:")) {
+        if (key.startsWith("CURSOR_LEFT:") || key.startsWith("CURSOR_RIGHT:") || key.startsWith("CURSOR_UP:") || key.startsWith("CURSOR_DOWN:")) {
             val right = key.startsWith("CURSOR_RIGHT:")
             val count = key.substringAfter(":").toIntOrNull()?.coerceIn(1,20) ?: return
             repeat(count) {
-                val code = if (right) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+                val code = when { key.startsWith("CURSOR_UP:") -> KeyEvent.KEYCODE_DPAD_UP; key.startsWith("CURSOR_DOWN:") -> KeyEvent.KEYCODE_DPAD_DOWN; right -> KeyEvent.KEYCODE_DPAD_RIGHT; else -> KeyEvent.KEYCODE_DPAD_LEFT }
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
                 ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
             }
@@ -267,7 +267,7 @@ class IKeyService : InputMethodService() {
             "⌫" -> { val selected=ic.getSelectedText(0); if (!selected.isNullOrEmpty()) ic.commitText("",1) else ic.deleteSurroundingTextInCodePoints(1,0); updateSuggestions() }
             "?123" -> { symbols = true; refresh() }
             "ABC" -> { symbols = false; numeric = false; keyboard?.showLetters(); refresh() }
-            "#+=" -> { symbols = true; refresh() }
+            "#+=", "123" -> { symbols = true; keyboard?.nextSymbolPage() }
             "space" -> { commitSeparator(" "); updateSuggestions() }
             "↵" -> {
                 val action = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
