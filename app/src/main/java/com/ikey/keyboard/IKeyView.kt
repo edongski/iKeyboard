@@ -87,6 +87,11 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             longPressTriggered=true
             onKey("DELETE_WORD")
             invalidate()
+        } else if(showNumberHints() && key!=null && key.length==1 && "qwertyuiop".contains(key)) {
+            val index="qwertyuiop".indexOf(key)
+            longPressTriggered=true
+            onKey("CHAR:"+(if(index==9) "0" else (index+1).toString()))
+            invalidate()
         } else if(key in listOf("a","e","i","o","u","n","c")) {
             val accents=mapOf("a" to "á","e" to "é","i" to "í","o" to "ó","u" to "ú","n" to "ñ","c" to "ç")
             val selected=accents[key]
@@ -95,6 +100,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     }
     private fun cancelPendingLongPress() { longPressHandler.removeCallbacks(longPressTask) }
     private val margin = 3f * density
+    private fun showNumberHints() = prefs.getBoolean("number_hints",false)
     init { isClickable = true; setLayerType(LAYER_TYPE_SOFTWARE,null) }
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
     fun showEmoji() { emojiMode=!emojiMode; clipboardMode=false; rebuild(width); invalidate() }
@@ -191,7 +197,17 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 clipboardItems.getOrNull(index)?.replace("\n"," ")?.take(12) ?: "—"
             } else if(shift && !symbols && !emojiMode && !clipboardMode) key.text.uppercase() else key.text
             val cy=key.rect.centerY()-(paint.ascent()+paint.descent())/2
-            c.drawText(text,key.rect.centerX(),cy,paint)
+            val hint=if(showNumberHints() && !symbols && !numeric && !emojiMode && !clipboardMode)
+                "qwertyuiop".indexOf(key.text).takeIf { it>=0 }?.let { if(it==9) "0" else (it+1).toString() }
+                else null
+            if(hint!=null) {
+                paint.textSize=22f*density
+                c.drawText(text,key.rect.centerX(),cy+5f*density,paint)
+                paint.textSize=10f*density
+                paint.color=if(dark) Color.LTGRAY else Color.DKGRAY
+                paint.textAlign=Paint.Align.RIGHT
+                c.drawText(hint,key.rect.right-4f*density,key.rect.top+11f*density,paint)
+            } else c.drawText(text,key.rect.centerX(),cy,paint)
         }
         if(swipeActive && swipePoints.size>1 && prefs.getBoolean("swipe_trail",true)) {
             paint.color=accent()
