@@ -76,6 +76,20 @@ class IKeyService : InputMethodService() {
     private fun refresh() { keyboard?.update(symbols, shifted || caps, numeric, prefs.getBoolean("dark",false)); updateSuggestions() }
     private fun handle(key: String) {
         val ic = currentInputConnection ?: return
+        if(key.startsWith("CHAR:")) {
+            val value=key.removePrefix("CHAR:")
+            if(value.isNotEmpty()) ic.commitText(if(shifted || caps) value.uppercase() else value,1)
+            if(shifted && !caps) { shifted=false; refresh() }
+            updateSuggestions()
+            return
+        }
+        if(key=="DELETE_WORD") {
+            val text=ic.getTextBeforeCursor(120,0)?.toString().orEmpty()
+            val count=Regex("\\s*[^\\s]+\\s*$").find(text)?.value?.length ?: 0
+            if(count>0) ic.deleteSurroundingTextInCodePoints(count,0)
+            updateSuggestions()
+            return
+        }
         if(key.startsWith("SUGGEST:")) {
             val suggestion=key.removePrefix("SUGGEST:")
             val (prefix,_)=contextWords()
@@ -139,7 +153,7 @@ class IKeyService : InputMethodService() {
             }
             "🌐" -> switchToNextInputMethod(false)
             else -> {
-                val value=if(!symbols && (shifted || caps)) key.uppercase() else key
+                val value=if(!symbols && (shifted || caps) && keyboard?.isEmojiMode()!=true) key.uppercase() else key
                 ic.commitText(value,1)
                 if (shifted && !caps && !symbols) { shifted = false; refresh() }
                 updateSuggestions()
