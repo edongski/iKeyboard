@@ -39,6 +39,12 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("swipe_enabled",checked).apply() }
         })
         layout.addView(label("Swipe across letters to enter common English and Filipino words. The starter dictionary is limited and runs offline.", 13f))
+        layout.addView(Switch(this).apply {
+            text="Show numbers above QWERTY letters"; textSize=16f
+            isChecked=prefs.getBoolean("number_hints",false)
+            setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("number_hints",checked).apply() }
+        })
+        layout.addView(label("When enabled, Q–P show 1–0 as small labels. Hold those letters to enter the number. Reopen the keyboard to apply.",13f))
         layout.addView(label("Keyboard accent color",15f))
         val accentOptions=arrayOf("Blue","Purple","Green","Orange","Pink")
         val accentSpinner=Spinner(this)
