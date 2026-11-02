@@ -22,7 +22,7 @@ class MainActivity : Activity() {
         fun label(s: String, size: Float) = TextView(this).apply { text=s; textSize=size; setTextColor(Color.rgb(30,30,35)); setPadding(0,12,0,12) }
         fun button(s: String, action: () -> Unit) = Button(this).apply { text=s; setOnClickListener { action() } }
         layout.addView(label("iKey Keyboard", 30f))
-        layout.addView(label("Phase 4 • Predictive Keyboard", 16f))
+        layout.addView(label("Phase 5 • Personalization & Tools", 16f))
         layout.addView(label("1. Enable iKey in Android keyboard settings.\n2. Select iKey as your keyboard.\n3. Test typing below.", 15f))
         layout.addView(button("1  ENABLE KEYBOARD") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
         layout.addView(button("2  SELECT KEYBOARD") { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() })
@@ -51,6 +51,31 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("autocorrect",checked).apply() }
         })
         layout.addView(label("Suggestions are processed offline. Predictions are disabled in password fields. Autocorrect uses a starter English/Tagalog dictionary.",13f))
+        layout.addView(label("Phase 5: Keyboard layout and shortcuts",18f))
+        val handOptions=arrayOf("Off","Left","Right")
+        val handSpinner=Spinner(this)
+        handSpinner.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,handOptions)
+        handSpinner.setSelection(handOptions.indexOf(prefs.getString("one_hand","Off")).coerceAtLeast(0))
+        handSpinner.onItemSelectedListener=object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent:android.widget.AdapterView<*>?) {}
+            override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:android.view.View?,position:Int,id:Long) {
+                prefs.edit().putString("one_hand",handOptions[position]).apply()
+            }
+        }
+        layout.addView(label("One-handed keyboard: Off / Left / Right",15f))
+        layout.addView(handSpinner)
+        layout.addView(label("Text shortcuts (one per line: shortcut=expanded text)",15f))
+        val shortcuts=EditText(this).apply {
+            hint="brb=be right back"
+            setSingleLine(false); minLines=3; maxLines=6
+            setText(prefs.getString("shortcuts",""))
+        }
+        layout.addView(shortcuts)
+        layout.addView(button("SAVE TEXT SHORTCUTS") {
+            prefs.edit().putString("shortcuts",shortcuts.text.toString().take(4000)).apply()
+            Toast.makeText(this,"Shortcuts saved",Toast.LENGTH_SHORT).show()
+        })
+        layout.addView(label("Emoji: tap 😊 on the keyboard. Clipboard: tap 📋 then PASTE. Clipboard content is accessed only when requested and is not saved by iKey.",13f))
         layout.addView(label("Touch detection mode", 18f))
         val modes = arrayOf("Classic","Smart","Adaptive")
         val spinner = Spinner(this)
@@ -90,7 +115,7 @@ class MainActivity : Activity() {
         layout.addView(label("Touch settings apply when the keyboard next opens. Drag sideways on the spacebar to move the cursor.", 13f))
         layout.addView(label("Try your keyboard:", 17f))
         layout.addView(EditText(this).apply { hint="Tap here and start typing"; minLines=3; gravity=Gravity.TOP; inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE })
-        layout.addView(label("Phase 4: offline word suggestions, tappable prediction bar, optional autocorrect and basic English/Tagalog next-word suggestions. The vocabulary is limited; no cloud typing data is sent.", 13f))
+        layout.addView(label("Phase 5: emoji picker, on-demand clipboard paste, text shortcuts, and one-handed layouts. Voice dictation and clipboard history are not included in this build.", 13f))
         setContentView(ScrollView(this).apply { addView(layout) })
     }
 }
