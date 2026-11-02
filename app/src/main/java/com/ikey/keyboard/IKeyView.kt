@@ -16,6 +16,28 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var numeric = false
     private var dark = false
     private var pressed: Key? = null
+    private val prefs = context.getSharedPreferences("ikey", Context.MODE_PRIVATE)
+    private var downX = 0f
+    private var downY = 0f
+    private var spaceDrag = false
+    private var cursorSteps = 0
+    private fun smartHit(x: Float, y: Float): Key? {
+        if (keys.isEmpty()) return null
+        val px = x - prefs.getInt("offset_x",0).coerceIn(-30,30)*density
+        val py = y - prefs.getInt("offset_y",0).coerceIn(-30,30)*density
+        val mode = prefs.getString("touch_mode","Adaptive") ?: "Adaptive"
+        val sensitivity = prefs.getInt("sensitivity",50).coerceIn(0,100)/100f
+        val expansion = if(mode=="Classic") 0f else (3f+13f*sensitivity)*density
+        return keys.filter {
+            px>=it.rect.left-expansion && px<=it.rect.right+expansion &&
+            py>=it.rect.top-expansion && py<=it.rect.bottom+expansion
+        }.minByOrNull {
+            val nx=(px-it.rect.centerX())/max(it.rect.width()/2,1f)
+            val ny=(py-it.rect.centerY())/max(it.rect.height()/2,1f)
+            nx*nx+ny*ny*(if(mode=="Adaptive") 0.75f else 1f)
+        }
+    }
+
     private val density = resources.displayMetrics.density
     private val rowHeight = 53f * density
     private val margin = 3f * density
@@ -82,20 +104,37 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             c.drawText(if(shift&&!symbols)key.text.uppercase() else key.text,r.centerX(),r.centerY()-(paint.ascent()+paint.descent())/2,paint)
         }
     }
+
     override fun onTouchEvent(event:MotionEvent):Boolean {
         when(event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> { pressed=keys.firstOrNull{it.rect.contains(event.x,event.y)} ?: keys.filter{abs(it.rect.centerY()-event.y)<rowHeight/2}.minByOrNull{abs(it.rect.centerX()-event.x)}; invalidate(); return true }
-            MotionEvent.ACTION_MOVE -> { invalidate(); return true }
+            MotionEvent.ACTION_DOWN -> {
+                downX=event.x; downY=event.y; spaceDrag=false; cursorSteps=0
+                pressed=smartHit(event.x,event.y)
+                invalidate(); return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if(pressed?.text=="space" && abs(event.x-downX)>14f*density) {
+                    spaceDrag=true
+                    val target=((event.x-downX)/(23f*density)).toInt()
+                    val delta=(target-cursorSteps).coerceIn(-20,20)
+                    if(delta>0) onKey("CURSOR_RIGHT:" + delta)
+                    if(delta<0) onKey("CURSOR_LEFT:" + (-delta))
+                    cursorSteps+=delta
+                } else if(!spaceDrag && hypot(event.x-downX,event.y-downY)>18f*density) {
+                    pressed=smartHit(event.x,event.y) ?: pressed
+                }
+                invalidate(); return true
+            }
             MotionEvent.ACTION_UP -> {
-                val key=pressed
+                val key=if(spaceDrag) null else smartHit(event.x,event.y) ?: pressed
                 pressed=null; invalidate()
-                if(key!=null && abs(event.x-key.rect.centerX()) < max(key.rect.width(),55*density) && abs(event.y-key.rect.centerY())<rowHeight) {
+                if(key!=null && abs(event.y-downY)<rowHeight*1.4f) {
                     performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     onKey(key.text)
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { pressed=null; invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { pressed=null; spaceDrag=false; invalidate(); return true }
         }
         return true
     }
