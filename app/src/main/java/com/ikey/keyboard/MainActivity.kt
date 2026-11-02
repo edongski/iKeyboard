@@ -49,6 +49,11 @@ class MainActivity : Activity() {
             isChecked=prefs.getBoolean("number_hints",false)
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("number_hints",checked).apply() }
         })
+        layout.addView(Switch(this).apply {
+            text="Add a separate number row above letters"; textSize=16f
+            isChecked=prefs.getBoolean("number_row",false)
+            setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("number_row",checked).apply() }
+        })
         layout.addView(label("When enabled, Q–P show 1–0 as small labels. Hold those letters to enter the number. Reopen the keyboard to apply.",13f))
         layout.addView(label("Keyboard accent color",15f))
         val accentOptions=arrayOf("Blue","Purple","Green","Orange","Pink")
@@ -62,10 +67,11 @@ class MainActivity : Activity() {
             }
         }
         layout.addView(accentSpinner)
+        layout.addView(label("Predictions are OFF by default. Turn them on below if wanted.",13f))
         layout.addView(label("Phase 4: Suggestions and autocorrect",18f))
         layout.addView(Switch(this).apply {
             text="Show word suggestions"; textSize=16f
-            isChecked=prefs.getBoolean("predictions",true)
+            isChecked=prefs.getBoolean("predictions",false)
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("predictions",checked).apply() }
         })
         layout.addView(Switch(this).apply {
