@@ -60,7 +60,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private fun swipeEnabled() = prefs.getBoolean("swipe_enabled",true)
     private fun addSwipePoint(x:Float,y:Float) {
         if(swipePoints.size<600) swipePoints.add(PointF(x,y))
-        val hit=keys.firstOrNull { it.rect.contains(x,y) }?.text
+        val hit=keys.firstOrNull { it.text.length==1 && it.text[0] in 'a'..'z' && it.rect.contains(x,y) }?.text
             ?: keys.filter { it.text.length==1 && it.text[0] in 'a'..'z' }
                 .minByOrNull { hypot(it.rect.centerX()-x,it.rect.centerY()-y) }
                 ?.takeIf { hypot(it.rect.centerX()-x,it.rect.centerY()-y)<rowHeight*0.78f }?.text
@@ -245,6 +245,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     override fun onTouchEvent(event:MotionEvent):Boolean {
         when(event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
                 if(event.y<resizeHandleHeight) {
                     resizing=true; resizeStartY=event.rawY
                     resizeStartHeight=prefs.getInt("key_height",53).coerceIn(38,90)
