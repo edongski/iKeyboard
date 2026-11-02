@@ -5,6 +5,8 @@ import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.KeyEvent
+import android.content.ClipboardManager
+import android.content.Context
 
 class IKeyService : InputMethodService() {
     private var keyboard: IKeyView? = null
@@ -95,10 +97,27 @@ class IKeyService : InputMethodService() {
             return
         }
         when(key) {
+            "😊" -> keyboard?.showEmoji()
+            "📋" -> {
+                if(!suggestionsAllowed) return
+                val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val preview=if(clipboard.hasPrimaryClip()) "Ready to paste" else "Empty"
+                keyboard?.setClipboardPreview(preview)
+            }
+            "PASTE" -> {
+                if(!suggestionsAllowed) return
+                val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip=clipboard.primaryClip
+                val item=if(clip!=null && clip.itemCount>0) clip.getItemAt(0) else null
+                val value=item?.coerceToText(this)?.toString()
+                if(!value.isNullOrEmpty()) ic.commitText(value.take(10000),1)
+                keyboard?.showLetters(); updateSuggestions()
+            }
+            "CLEAR" -> { keyboard?.showLetters(); updateSuggestions() }
             "⇧" -> { if (shifted) { caps = !caps; shifted = caps } else shifted = true; refresh() }
             "⌫" -> { val selected=ic.getSelectedText(0); if (!selected.isNullOrEmpty()) ic.commitText("",1) else ic.deleteSurroundingTextInCodePoints(1,0); updateSuggestions() }
             "?123" -> { symbols = true; refresh() }
-            "ABC" -> { symbols = false; numeric = false; refresh() }
+            "ABC" -> { symbols = false; numeric = false; keyboard?.showLetters(); refresh() }
             "#+=" -> { symbols = true; refresh() }
             "space" -> { commitSeparator(" "); updateSuggestions() }
             "↵" -> {
@@ -109,7 +128,12 @@ class IKeyService : InputMethodService() {
             }
             "🌐" -> switchToNextInputMethod(false)
             else -> {
-                ic.commitText(if (!symbols && (shifted || caps)) key.uppercase() else key,1)
+                val shortcuts=prefs.getString("shortcuts","").orEmpty().lineSequence().mapNotNull {
+                    val parts=it.split("=",limit=2)
+                    if(parts.size==2 && parts[0].isNotBlank()) parts[0].trim() to parts[1].trim() else null
+                }.toMap()
+                val value=if(!symbols && (shifted || caps)) key.uppercase() else key
+                ic.commitText(value,1)
                 if (shifted && !caps && !symbols) { shifted = false; refresh() }
                 updateSuggestions()
             }
