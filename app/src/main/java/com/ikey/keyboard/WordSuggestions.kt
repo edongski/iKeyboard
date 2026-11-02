@@ -105,7 +105,84 @@ mahina mabilis mabagal malaki maliit mataas mababa mahaba maikli
 bago luma tama mali totoo hindi totoo oo naman sige okay ayos
 maayos mabuti mabuhay paalam kita tayo ulit mamaya bukas
 """).trim().split(Regex("\\s+")).distinct()
-    val vocabulary:List<String> by lazy { (words+extraWords).distinct() }
+    private val commonFilipino = """
+    abala abangan abante abot agad agahan agila ahas akala aklat akyat alaala alaga
+    alalahanin alangan alamin alam araw araw-araw asahan asikaso asim atensyon
+    bagal bagyo bahala balak balita balik balikan balikat balot bangon bantay basa
+    basahin batay batang bata bayani bayan bayaran bentahan bili bilhin bilis bitbit
+    bukas bukod buhay bulaklak bundok buong buo buti buto
+    dahilan dalawa dalhin daliri damdamin dami damihan damo dating dati
+    dayuhan dagdag dagdagan dalaw dalawin daloy dasal dasalan dahan dahan-dahan
+    desisyon dibdib dilim dilaw diretso diskarte diwa doble doktor dulo dumaan
+    dumating dumiretso dumulas dumami dumalo dumating dumaan dun
+    gabi gabi-gabi gabay galaw galit gamit gamitin ganda ganito ganun gawa
+    gawin gawi ginamit ginawa gising gulay gulong gubat guro
+    hakbang halos halaga halimbawa hanap hanapin hangin hanggang handa handaan
+    handog hapunan harap harapan hapon hati hatid hatiran hawak hawakan
+    hirap hiramin hinay hintay hintayin hinto hiling hinahanap hinahanap
+    ibaba ibalik ibigay ibili ibon idagdag idaan ihatid iisip isip
+    ilagay ilabas ilaw ilayo ilang ilog imahe imbitahan inaalala inaasahan
+    ingatan ininom iniisip inip init inumin ipakita ipasa ipon
+    isa isang isama isulat isuko itabi itaas itago itapon itigil ito
+    kaagad kababayan kabaitan kabuhayan kadalasan kagabi kagandahan kahapon
+    kaharap kahit kailan kaibigan kailangan kakain kakilala kakayanin kalaban
+    kalamangan kalangitan kalat kalayaan kalimutan kalinawan kalikasan
+    kalusugan kamay kaming kanina kanan kandila kantahan kapatid kapag
+    kapalit kapayapaan karapatan karaniwan karanasan kasalanan kasal kasali
+    kasambahay kasama kasiyahan kasunod katabi katapusan katawan katotohanan
+    kawalan kawawa kaya kayang kaya-kaya kilala kilalanin kilos kinabukasan
+    kinain kinuha kita kulay kumain kumanta kumilos kumpleto kumuha
+    laban labas labanan lagay lagyan lahat lakas lalaki lamang lambing
+    langit lapit lapitan laro laruan lasang layo likod likas liham
+    libre ligaya ligtas linis linisin lipat lumabas lumakad lumaki lumapit
+    lumayo lumilipad lumipat lumunok luto lutong luwag
+    madali madalas magaan maganda magaling maganda magbago magbayad magbigay
+    magbukas magdala magdasal maghanap maghintay magisip maglakad maglaro
+    magluto magmahal magmaneho magpahinga magpaalam magpasalamat magpunta
+    magsabi magsama magsimula magsulat magtanong magtrabaho magturo
+    mahaba mahala mahalaga mahirap mahinahon mahina mahuli mainam mainit
+    makakaya makalipas makapunta makatao makita malakas malapit malayo
+    maliban maligaya malinis malumanay maluwag mamaya manalo manamit
+    maniwala manok marami masaya masipag matagal matakot matalino matanda
+    matapang matibay matino mayaman mayroon medyo minsan minuto
+    naaalala naalala nagaaral nagbago nagbigay nagdaan nagdala naghahanap
+    naghihintay naglakad naglalaro nagluto nagmahal nagpunta nagsabi
+    nagsimula nagtapos nagtatanong nagtrabaho nagulat nakita nalaman
+    naligo nalimutan nanalo nandito nandiyan nandoon napagod narinig
+    nasaan nasabi nasaktan nasanay natapos natulog natural nawala
+    ngiti ngumiti nilaga nilagay niluto ninanais nobela numero
+    oras oras-oras paalala paalam paakyat pagasa pagbayad pagbili pagdaan
+    pagdating pagibig pagkain paglalakbay paglalakad paglalaro paglipat
+    pagmamahal pagmamadali pagod pagpili pagpunta pagsabi pagsama
+    pagsisimula pagtatapos pagtatanong pagtawa pagtulong paguwi
+    pahinga pahiram pakain pakialam pakiramdam palagi palakasin
+    palengke palitan pamahalaan pamasahe panahon panalo panaginip
+    panalangin pananaw panay pandesal pangako panganay pangarap
+    pangit pangyayari pansin pansinin pantay panto pantulog
+    paraan pareho parating parte pasok pasukan pataas patak patuloy
+    patingin patnubay payapa payong pera perpekto pili piliin pinili
+    pinoy pintuan pisngi pito plano po porma posibleng presyo
+    problema proseso programa proyekto puno punong punas puntahan
+    puso puti puyat
+    regalo relasyon respeto resulta riles rosas
+    sabi sabihin saglit sakit saksi sakyan sala salamin salita salubong
+    sama samahan samantala sandali sanggol sapatos sapat sarap sariwa
+    sarili sasakyan sasama sasayaw sasabihin sayang sayaw seryoso
+    serbisyo sigla sigurado silid simula simulan simpleng singil
+    sinubukan sipag sitwasyon sobra solusyon sulat sumagot sumakay
+    sumali sumama sumayaw sumigaw sumulat sundin sunod susi
+    taas tabi tabihan tagal tagalog tagumpay tahimik takbo takot
+    takpan tala talagang talino tama tamaan tambay tanaw tanong
+    tapang tapos tapusin taralets tatay tawag tawagan tawa tawanan
+    tayo teknolohiya telepono tiwala tiyak tindahan tingin tingnan
+    tipid tira tirahan tulog tulong tulungan tumakbo tumawa tumingin
+    tumira tumulong tunog tunay tuwa tuwing
+    ubos uhaw ulam ulan ulap uli ulit umaga umalis umakyat umasa
+    umiinom umiiyak umiikot umikot umalis umuwi unang unahan
+    unawain unti unti-unti usap usapan uso utak utang utos uwi
+    wagas wala walang walis wasto wika
+    """.trim().split(Regex("\\s+")).filter { it.all { ch -> ch in 'a'..'z' } }
+    val vocabulary:List<String> by lazy { (words+extraWords+commonFilipino).distinct() }
     private val byInitial by lazy { vocabulary.groupBy { it.firstOrNull() } }
     private val correctionCache=object:LinkedHashMap<String,String?>(256,0.75f,true) {
         override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,String?>?):Boolean = size>256
