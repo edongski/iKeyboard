@@ -28,16 +28,19 @@ class IKeyService : InputMethodService() {
         prefs.edit().putStringSet("learned_words",updated).apply()
     }
     private fun clipboardHistory():List<String> =
-        prefs.getString("clipboard_history","").orEmpty().split("\\u0001").filter { it.isNotEmpty() }.take(9)
+        prefs.getString("clipboard_history","").orEmpty().split(1.toChar()).filter { it.isNotEmpty() }.take(9)
     private fun saveClipboard(value:String) {
         if(value.isBlank() || !prefs.getBoolean("clipboard_history_enabled",false)) return
         val updated=(listOf(value.take(1000))+clipboardHistory().filter { it!=value }).take(9)
-        prefs.edit().putString("clipboard_history",updated.joinToString("\\u0001")).apply()
+        prefs.edit().putString("clipboard_history",updated.joinToString(1.toChar().toString())).apply()
     }
     private fun updateAutoCapitalization() {
         if(!prefs.getBoolean("auto_caps",true) || numeric || symbols) return
         val before=currentInputConnection?.getTextBeforeCursor(100,0)?.toString().orEmpty()
-        if(before.isBlank() || before.trimEnd().lastOrNull() in listOf('.','!','?',10.toChar())) {
+        val trimmed=before.trimEnd()
+        val sentenceStart=before.isBlank() || (before.lastOrNull()?.isWhitespace()==true &&
+            trimmed.lastOrNull() in listOf('.','!','?',10.toChar()))
+        if(sentenceStart) {
             if(!shifted && !caps) { shifted=true; refresh() }
         }
     }
@@ -67,6 +70,7 @@ class IKeyService : InputMethodService() {
             if(shortcut!=null) {
                 ic.deleteSurroundingText(prefix.length,0)
                 ic.commitText(shortcut+separator,1)
+                updateAutoCapitalization()
                 return
             }
         }
@@ -78,7 +82,7 @@ class IKeyService : InputMethodService() {
                 rememberWord(replacement)
             }
         }
-        if(prefix.isNotBlank() && WordSuggestions.correction(prefix,learned())==null) rememberWord(prefix)
+        if(prefix.isNotBlank() && (!prefs.getBoolean("autocorrect",true) || WordSuggestions.correction(prefix,learned())==null)) rememberWord(prefix)
         ic.commitText(separator,1)
         updateAutoCapitalization()
     }
@@ -145,22 +149,26 @@ class IKeyService : InputMethodService() {
         }
         if(key=="◀" || key=="▶") { keyboard?.nextEmojiPage(if(key=="▶") 1 else -1); return }
         if(key.startsWith("CLIP:")) {
+            if(!suggestionsAllowed) return
             val index=key.substringAfter(":").toIntOrNull() ?: return
             val value=clipboardHistory().getOrNull(index) ?: return
             ic.commitText(value,1); keyboard?.showLetters(); updateSuggestions(); return
         }
         if(key=="SAVE") {
+            if(!suggestionsAllowed) return
             val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip=clipboard.primaryClip
             val value=if(clip!=null && clip.itemCount>0) clip.getItemAt(0).coerceToText(this).toString() else ""
             saveClipboard(value); keyboard?.setClipboardItems(clipboardHistory()); return
         }
         if(key=="DELETE CLIP") {
+            if(!suggestionsAllowed) return
             val updated=clipboardHistory().drop(1)
-            prefs.edit().putString("clipboard_history",updated.joinToString("\\u0001")).apply()
+            prefs.edit().putString("clipboard_history",updated.joinToString(1.toChar().toString())).apply()
             keyboard?.setClipboardItems(updated); return
         }
         if(key=="CLEAR ALL") {
+            if(!suggestionsAllowed) return
             prefs.edit().remove("clipboard_history").apply()
             keyboard?.setClipboardItems(emptyList()); return
         }
