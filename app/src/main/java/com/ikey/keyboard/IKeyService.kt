@@ -59,7 +59,11 @@ class IKeyService : InputMethodService() {
             keyboard?.setSuggestions(emptyList()); return
         }
         val (prefix,previous)=contextWords()
-        keyboard?.setSuggestions(WordSuggestions.candidates(prefix,previous,learned()))
+        try { keyboard?.setSuggestions(WordSuggestions.candidates(prefix,previous,learned())) }
+        catch(e:Exception) {
+            android.util.Log.e("iKeyboard","Suggestion engine failed",e)
+            keyboard?.setSuggestions(emptyList())
+        }
     }
     private fun commitSeparator(separator:String) {
         val ic=currentInputConnection ?: return
@@ -90,6 +94,9 @@ class IKeyService : InputMethodService() {
     }
     override fun onCreate() {
         super.onCreate()
+        try { WordSuggestions.initialize(this) } catch(e:Exception) {
+            android.util.Log.e("iKeyboard","Dictionary initialization failed; using built-in words",e)
+        }
         // Keep the IME above the system navigation bar instead of drawing behind it.
         window?.window?.let { w ->
             w.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
@@ -105,7 +112,12 @@ class IKeyService : InputMethodService() {
         }
     }
     override fun onCreateInputView(): View {
-        keyboard = IKeyView(this) { key -> handle(key) }
+        keyboard = IKeyView(this) { key ->
+            try { handle(key) } catch(e:Exception) {
+                android.util.Log.e("iKeyboard","Keyboard key action failed: "+key,e)
+                try { keyboard?.showLetters(); keyboard?.setSuggestions(emptyList()) } catch(_:Exception) {}
+            }
+        }
         refresh()
         return keyboard!!
     }
