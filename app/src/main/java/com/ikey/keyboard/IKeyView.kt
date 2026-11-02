@@ -144,8 +144,8 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             listOf(page.take(10),page.drop(10).take(10),page.drop(20).take(10),
                 listOf("ABC","◀","▶","⌫","space","↵"))
         } else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
-        else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC","😊","📋","🌐","space",".","↵"))
-        else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123","😊","📋","🌐","space",".","↵"))
+        else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC",",","space",".","↵"))
+        else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123",",","space",".","↵"))
         val finalRows=if(numberRowEnabled() && !numeric && !symbols && !emojiMode && !clipboardMode && !dictionaryMode) listOf(listOf("1","2","3","4","5","6","7","8","9","0"))+rows else rows
         finalRows.forEachIndexed { row, items ->
             val weights=items.map { when(it) { "space"->4.0f; "⇧","⌫","?123","ABC","↵","PASTE","CLEAR"->1.45f; "🌐","😊","📋"->1.1f; else->1f } }
