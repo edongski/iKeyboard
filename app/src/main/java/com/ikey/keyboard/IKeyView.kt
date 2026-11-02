@@ -47,6 +47,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private fun numberRowEnabled()=prefs.getBoolean("number_row",false)
     private fun showPredictionBar()=prefs.getBoolean("predictions",false)
     private var resizing = false
+    private var accessoryHandled = false
     private var resizeStartY = 0f
     private var resizeStartHeight = 53
     fun setSuggestions(items:List<String>) { suggestions=items.take(3); invalidate() }
@@ -265,6 +266,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     override fun onTouchEvent(event:MotionEvent):Boolean {
         when(event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                accessoryHandled=false
                 parent?.requestDisallowInterceptTouchEvent(true)
                 if(event.y<resizeHandleHeight) {
                     resizing=true; resizeStartY=event.rawY
@@ -272,6 +274,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     cancelPendingLongPress(); return true
                 }
                 if(event.y>height-accessoryHeight) {
+                    accessoryHandled=true
                     val index=(event.x/(width/4f)).toInt().coerceIn(0,3)
                     onKey(listOf("😊","📋","📖","🌐")[index])
                     return true
@@ -287,6 +290,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_MOVE -> {
+                if(accessoryHandled) return true
                 if(resizing) {
                     val next=(resizeStartHeight+((resizeStartY-event.rawY)/density/4f).toInt()).coerceIn(38,90)
                     if(next!=prefs.getInt("key_height",53)) {
@@ -330,6 +334,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_UP -> {
+                if(accessoryHandled) { accessoryHandled=false; performClick(); return true }
                 if(resizing) { resizing=false; performClick(); return true }
                 cancelPendingLongPress()
                 if(longPressTriggered) {
@@ -369,7 +374,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { resizing=false; cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { accessoryHandled=false; resizing=false; cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
         }
         return true
     }
