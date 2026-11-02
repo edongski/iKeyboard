@@ -22,7 +22,7 @@ class MainActivity : Activity() {
         fun label(s: String, size: Float) = TextView(this).apply { text=s; textSize=size; setTextColor(Color.rgb(30,30,35)); setPadding(0,12,0,12) }
         fun button(s: String, action: () -> Unit) = Button(this).apply { text=s; setOnClickListener { action() } }
         layout.addView(label("iKey Keyboard", 30f))
-        layout.addView(label("Phase 5 • Personalization & Tools", 16f))
+        layout.addView(label("Phase 6 • Comfort & Accessibility", 16f))
         layout.addView(label("1. Enable iKey in Android keyboard settings.\n2. Select iKey as your keyboard.\n3. Test typing below.", 15f))
         layout.addView(button("1  ENABLE KEYBOARD") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
         layout.addView(button("2  SELECT KEYBOARD") { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() })
@@ -76,6 +76,31 @@ class MainActivity : Activity() {
             Toast.makeText(this,"Shortcuts saved",Toast.LENGTH_SHORT).show()
         })
         layout.addView(label("Emoji: tap 😊 on the keyboard. Clipboard: tap 📋 then PASTE. Clipboard content is accessed only when requested and is not saved by iKey.",13f))
+        layout.addView(label("Phase 6: Comfort and accessibility",18f))
+        layout.addView(Switch(this).apply {
+            text="Vibration on key press"; textSize=16f
+            isChecked=prefs.getBoolean("haptics",true)
+            setOnCheckedChangeListener { _,enabled -> prefs.edit().putBoolean("haptics",enabled).apply() }
+        })
+        layout.addView(Switch(this).apply {
+            text="Show swipe trail"; textSize=16f
+            isChecked=prefs.getBoolean("swipe_trail",true)
+            setOnCheckedChangeListener { _,enabled -> prefs.edit().putBoolean("swipe_trail",enabled).apply() }
+        })
+        layout.addView(label("Key height (42–72 dp)",15f))
+        val keyHeight=SeekBar(this).apply {
+            max=30
+            progress=prefs.getInt("key_height",53).coerceIn(42,72)-42
+            setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar:SeekBar?,progress:Int,fromUser:Boolean) {
+                    if(fromUser) prefs.edit().putInt("key_height",progress+42).apply()
+                }
+                override fun onStartTrackingTouch(bar:SeekBar?) {}
+                override fun onStopTrackingTouch(bar:SeekBar?) {}
+            })
+        }
+        layout.addView(keyHeight)
+        layout.addView(label("Long-press a/e/i/o/u/n/c for accents. Long-press backspace to delete a word. Keyboard height updates when the keyboard reopens.",13f))
         layout.addView(label("Touch detection mode", 18f))
         val modes = arrayOf("Classic","Smart","Adaptive")
         val spinner = Spinner(this)
@@ -115,7 +140,7 @@ class MainActivity : Activity() {
         layout.addView(label("Touch settings apply when the keyboard next opens. Drag sideways on the spacebar to move the cursor.", 13f))
         layout.addView(label("Try your keyboard:", 17f))
         layout.addView(EditText(this).apply { hint="Tap here and start typing"; minLines=3; gravity=Gravity.TOP; inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE })
-        layout.addView(label("Phase 5: emoji picker, on-demand clipboard paste, text shortcuts, and one-handed layouts. Voice dictation and clipboard history are not included in this build.", 13f))
+        layout.addView(label("Phase 6: adjustable key height, vibration toggle, swipe trail toggle, long-press accented characters, and delete-word gesture. Previous phases remain available.", 13f))
         setContentView(ScrollView(this).apply { addView(layout) })
     }
 }
