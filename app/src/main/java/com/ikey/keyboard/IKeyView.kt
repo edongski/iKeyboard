@@ -58,12 +58,28 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     }
 
     private val density = resources.displayMetrics.density
-    private val rowHeight = 53f * density
+    private val rowHeight get() = prefs.getInt("key_height",53).coerceIn(42,72)*density
+    private val longPressHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var longPressTriggered = false
+    private val longPressTask = Runnable {
+        val key=pressed?.text
+        if(key=="⌫") {
+            longPressTriggered=true
+            onKey("DELETE_WORD")
+            invalidate()
+        } else if(key in listOf("a","e","i","o","u","n","c")) {
+            val accents=mapOf("a" to "á","e" to "é","i" to "í","o" to "ó","u" to "ú","n" to "ñ","c" to "ç")
+            val selected=accents[key]
+            if(selected!=null) { longPressTriggered=true; onKey("CHAR:"+selected); invalidate() }
+        }
+    }
+    private fun cancelLongPress() { longPressHandler.removeCallbacks(longPressTask) }
     private val margin = 3f * density
     init { isClickable = true; setLayerType(LAYER_TYPE_SOFTWARE,null) }
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
     fun showEmoji() { emojiMode=!emojiMode; clipboardMode=false; rebuild(width); invalidate() }
     fun showLetters() { emojiMode=false; clipboardMode=false; rebuild(width); invalidate() }
+    fun isEmojiMode() = emojiMode
     override fun onMeasure(w: Int, h: Int) {
         val width = MeasureSpec.getSize(w)
         setMeasuredDimension(width, (4*rowHeight+barHeight).toInt() + (12*density).toInt())
@@ -144,11 +160,11 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.textAlign=Paint.Align.CENTER
             paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
             paint.textSize=(if(key.text=="space") 13 else if(key.text.length>1) 14 else 23)*density
-            val text=if(shift && !symbols) key.text.uppercase() else key.text
+            val text=if(shift && !symbols && !emojiMode && !clipboardMode) key.text.uppercase() else key.text
             val cy=key.rect.centerY()-(paint.ascent()+paint.descent())/2
             c.drawText(text,key.rect.centerX(),cy,paint)
         }
-        if(swipeActive && swipePoints.size>1) {
+        if(swipeActive && swipePoints.size>1 && prefs.getBoolean("swipe_trail",true)) {
             paint.color=if(dark) Color.rgb(135,190,255) else Color.rgb(44,112,225)
             paint.style=Paint.Style.STROKE
             paint.strokeWidth=4f*density
@@ -176,9 +192,14 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
                 if(swipeEnabled() && !symbols && !numeric) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
+                longPressTriggered=false
+                cancelLongPress()
+                if(pressed!=null) longPressHandler.postDelayed(longPressTask,550L)
                 invalidate(); return true
             }
             MotionEvent.ACTION_MOVE -> {
+                if(hypot(event.x-downX,event.y-downY)>12f*density) cancelLongPress()
+                if(longPressTriggered) return true
                 if(pressed?.text=="space" && abs(event.x-downX)>14f*density) {
                     spaceDrag=true
                     val target=((event.x-downX)/(23f*density)).toInt()
@@ -198,6 +219,10 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_UP -> {
+                cancelLongPress()
+                if(longPressTriggered) {
+                    longPressTriggered=false; pressed=null; invalidate(); performClick(); return true
+                }
                 if(swipeActive && !spaceDrag) {
                     addSwipePoint(event.x,event.y)
                     val decoded=SwipeDecoder.decode(swipeLetters.toString())
@@ -207,7 +232,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     performClick()
                     return true
                 }
-                if(!clipboardMode && downY<barHeight && event.y<barHeight && suggestions.isNotEmpty()) {
+                if(!clipboardMode && !emojiMode && downY<barHeight && event.y<barHeight && suggestions.isNotEmpty()) {
                     val index=(event.x/(width/3f)).toInt().coerceIn(0,suggestions.size-1)
                     pressed=null; invalidate()
                     onKey("SUGGEST:"+suggestions[index])
@@ -217,14 +242,15 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 val key=if(spaceDrag) null else smartHit(event.x,event.y) ?: pressed
                 pressed=null; invalidate()
                 if(key!=null && abs(event.y-downY)<rowHeight*1.4f) {
-                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    if(prefs.getBoolean("haptics",true)) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                     onKey(key.text)
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { cancelLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
         }
         return true
     }
+    override fun onDetachedFromWindow() { cancelLongPress(); super.onDetachedFromWindow() }
     override fun performClick():Boolean { super.performClick(); return true }
 }
