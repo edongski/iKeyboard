@@ -73,7 +73,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             if(selected!=null) { longPressTriggered=true; onKey("CHAR:"+selected); invalidate() }
         }
     }
-    private fun cancelLongPress() { longPressHandler.removeCallbacks(longPressTask) }
+    private fun cancelPendingLongPress() { longPressHandler.removeCallbacks(longPressTask) }
     private val margin = 3f * density
     init { isClickable = true; setLayerType(LAYER_TYPE_SOFTWARE,null) }
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
@@ -193,12 +193,12 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 if(swipeEnabled() && !symbols && !numeric) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
                 longPressTriggered=false
-                cancelLongPress()
+                cancelPendingLongPress()
                 if(pressed!=null) longPressHandler.postDelayed(longPressTask,550L)
                 invalidate(); return true
             }
             MotionEvent.ACTION_MOVE -> {
-                if(hypot(event.x-downX,event.y-downY)>12f*density) cancelLongPress()
+                if(hypot(event.x-downX,event.y-downY)>12f*density) cancelPendingLongPress()
                 if(longPressTriggered) return true
                 if(pressed?.text=="space" && abs(event.x-downX)>14f*density) {
                     spaceDrag=true
@@ -219,7 +219,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_UP -> {
-                cancelLongPress()
+                cancelPendingLongPress()
                 if(longPressTriggered) {
                     longPressTriggered=false; pressed=null; invalidate(); performClick(); return true
                 }
@@ -247,10 +247,10 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { cancelLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
         }
         return true
     }
-    override fun onDetachedFromWindow() { cancelLongPress(); super.onDetachedFromWindow() }
+    override fun onDetachedFromWindow() { cancelPendingLongPress(); super.onDetachedFromWindow() }
     override fun performClick():Boolean { super.performClick(); return true }
 }
