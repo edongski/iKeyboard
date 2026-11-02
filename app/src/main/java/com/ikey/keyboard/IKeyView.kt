@@ -163,7 +163,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         c.drawColor(if(dark) Color.rgb(42,44,49) else Color.rgb(208,211,219))
         paint.color=if(dark) Color.rgb(48,50,55) else Color.rgb(224,227,234)
         c.drawRect(0f,0f,width.toFloat(),barHeight,paint)
-        paint.color=if(dark) Color.LTGRAY else Color.DKGRAY
+        paint.color=Color.rgb(230,230,230) // 90% gray (#E6E6E6)
         c.drawRoundRect(RectF(width/2f-23f*density,5f*density,width/2f+23f*density,10f*density),4f*density,4f*density,paint)
         c.save()
         c.translate(0f,resizeHandleHeight)
