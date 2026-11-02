@@ -18,9 +18,20 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var emojiMode = false
     private var clipboardMode = false
     private var clipboardPreview = ""
+    private var clipboardItems:List<String> = emptyList()
+    private var emojiPage=0
+    private var downKey:Key?=null
+    private var lastTapSpace=0L
+    fun setClipboardItems(items:List<String>) {
+        clipboardItems=items.take(12)
+        clipboardPreview=if(items.isEmpty()) "No saved clips" else "${items.size} saved clips"
+        clipboardMode=true; emojiMode=false; rebuild(width); invalidate()
+    }
     fun setClipboardPreview(value:String) { clipboardPreview=value.take(80); clipboardMode=true; emojiMode=false; rebuild(width); invalidate() }
     private val emojis = listOf("😀","😂","🥰","😍","😊","😎","😭","🥺","😡","👍","👏","🙏","❤️","💕","🔥","🎉","💯","✨","👋","🤝","😅","🤔","😘","😁","😴","😇","🙌","💪","🇵🇭","🍔","☕","🎂")
 
+    private val extraEmojis = listOf("😃","😄","😆","😋","😛","😜","🤪","🤗","🤩","🥳","😌","😔","😢","😤","😠","🤬","😱","😨","😰","😳","🤯","🤒","🤕","🤢","🤮","😷","🤠","🥸","😈","👻","💀","👽","🤖","😺","😻","🙈","🙉","🙊","💋","💌","💘","💖","💝","💞","💓","💗","💟","💔","🧡","💛","💚","💙","💜","🖤","🤍","🤎","💐","🌹","🌷","🌻","🌺","🌸","🌼","🌈","☀️","🌙","⭐","🌟","⚡","☁️","🌧️","❄️","🌊","🌴","🌲","🌿","🍀","🍎","🍌","🍉","🍇","🍓","🍒","🍍","🥭","🥑","🍕","🍟","🍗","🍜","🍣","🍩","🍰","🍦","🥤","🍺","🏀","⚽","🏆","🎮","🎧","🎵","🎶","🎤","🎬","📱","💻","⌚","🚗","✈️","🚀","🏠","🏢","🎁","💰","💵","📌","📍","✅","❌","⚠️","❗","❓","💬","💭","🫶","🤌","🤞","✌️","🤟","👌","👊","✊","🫰","🖐️","👀","🧠","💃","🕺","🏃","🚶","👨","👩","👶","👨‍👩‍👧","🇺🇸","🇬🇧","🇯🇵","🇰🇷")
+    private val allEmojis by lazy { (emojis+extraEmojis).distinct() }
     private var suggestions: List<String> = emptyList()
     private val barHeight = 39f * resources.displayMetrics.density
     fun setSuggestions(items:List<String>) { suggestions=items.take(3); invalidate() }
@@ -79,6 +90,9 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
     fun showEmoji() { emojiMode=!emojiMode; clipboardMode=false; rebuild(width); invalidate() }
     fun showLetters() { emojiMode=false; clipboardMode=false; rebuild(width); invalidate() }
+    fun nextEmojiPage(delta:Int) { emojiPage=(emojiPage+delta+(allEmojis.size+29)/30)%((allEmojis.size+29)/30); rebuild(width); invalidate() }
+    fun currentClipboardItem(index:Int)=clipboardItems.getOrNull(index)
+    fun showSwipeAlternatives(items:List<String>) { suggestions=items.take(3); invalidate() }
     fun isEmojiMode() = emojiMode
     override fun onMeasure(w: Int, h: Int) {
         val width = MeasureSpec.getSize(w)
@@ -89,14 +103,17 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         if(w<=0)return
         keys.clear()
         val rows = if(clipboardMode) listOf(
-            listOf("PASTE","CLEAR","ABC"),
-            listOf("Clipboard is read only when you tap 📋"),
-            listOf("ABC"),
-            listOf("ABC")
-        ) else if(emojiMode) listOf(
-            emojis.subList(0,10),emojis.subList(10,20),emojis.subList(20,30),
-            listOf("ABC","😊","❤️","😂","⌫","space","↵")
-        ) else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
+            (0..2).map { "CLIP:$it" },
+            (3..5).map { "CLIP:$it" },
+            (6..8).map { "CLIP:$it" },
+            listOf("ABC","PASTE","SAVE","DELETE CLIP","CLEAR ALL")
+        ) else if(emojiMode) {
+            val pageCount=(allEmojis.size+29)/30
+            val start=(emojiPage%pageCount)*30
+            val page=allEmojis.drop(start).take(30)
+            listOf(page.take(10),page.drop(10).take(10),page.drop(20).take(10),
+                listOf("ABC","◀","▶","⌫","space","↵"))
+        } else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
         else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC","😊","📋","🌐","space",".","↵"))
         else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123","😊","📋","🌐","space",".","↵"))
         rows.forEachIndexed { row, items ->
@@ -159,8 +176,11 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.color=if(dark) Color.WHITE else Color.rgb(23,25,31)
             paint.textAlign=Paint.Align.CENTER
             paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
-            paint.textSize=(if(key.text=="space") 13 else if(key.text.length>1) 14 else 23)*density
-            val text=if(shift && !symbols && !emojiMode && !clipboardMode) key.text.uppercase() else key.text
+            paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 23)*density
+            val text=if(clipboardMode && key.text.startsWith("CLIP:")) {
+                val index=key.text.substringAfter(":").toIntOrNull() ?: -1
+                clipboardItems.getOrNull(index)?.replace("\\n"," ")?.take(12) ?: "—"
+            } else if(shift && !symbols && !emojiMode && !clipboardMode) key.text.uppercase() else key.text
             val cy=key.rect.centerY()-(paint.ascent()+paint.descent())/2
             c.drawText(text,key.rect.centerX(),cy,paint)
         }
@@ -192,6 +212,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
                 if(swipeEnabled() && !symbols && !numeric) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
+                downKey=pressed
                 longPressTriggered=false
                 cancelPendingLongPress()
                 if(pressed!=null) longPressHandler.postDelayed(longPressTask,550L)
@@ -207,8 +228,8 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     if(delta>0) onKey("CURSOR_RIGHT:" + delta)
                     if(delta<0) onKey("CURSOR_LEFT:" + (-delta))
                     cursorSteps+=delta
-                } else if(!spaceDrag && swipeEnabled() && !symbols && !numeric &&
-                    pressed?.text?.length==1 && pressed?.text?.firstOrNull() in 'a'..'z' &&
+                } else if(!spaceDrag && swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode &&
+                    downKey?.text?.length==1 && downKey?.text?.firstOrNull() in 'a'..'z' &&
                     hypot(event.x-downX,event.y-downY)>22f*density) {
                     swipeActive=true
                     for(i in 0 until event.historySize) addSwipePoint(event.getHistoricalX(i),event.getHistoricalY(i))
@@ -243,7 +264,14 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 pressed=null; invalidate()
                 if(key!=null && abs(event.y-downY)<rowHeight*1.4f) {
                     if(prefs.getBoolean("haptics",true)) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                    onKey(key.text)
+                    if(key.text=="space" && prefs.getBoolean("double_space_period",true) && !emojiMode) {
+                        val now=android.os.SystemClock.uptimeMillis()
+                        if(now-lastTapSpace<350) { onKey("DOUBLE_SPACE_PERIOD"); lastTapSpace=0L }
+                        else { onKey(key.text); lastTapSpace=now }
+                    } else {
+                        if(key.text!="space") lastTapSpace=0L
+                        onKey(key.text)
+                    }
                 }
                 performClick(); return true
             }
