@@ -15,6 +15,13 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var shift = false
     private var numeric = false
     private var dark = false
+    private fun accent():Int = when(prefs.getString("accent","Blue")) {
+        "Purple" -> Color.rgb(132,90,205)
+        "Green" -> Color.rgb(38,148,105)
+        "Orange" -> Color.rgb(220,120,48)
+        "Pink" -> Color.rgb(211,91,142)
+        else -> Color.rgb(44,112,225)
+    }
     private var emojiMode = false
     private var clipboardMode = false
     private var clipboardPreview = ""
@@ -163,7 +170,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         keys.forEach { key ->
             val special=key.text in listOf("⇧","⌫","?123","ABC","↵","🌐")
             val color=when {
-                pressed===key -> if(dark) Color.rgb(105,108,116) else Color.rgb(244,245,247)
+                pressed===key -> accent()
                 dark && special -> Color.rgb(85,88,95)
                 dark -> Color.rgb(66,69,76)
                 special -> Color.rgb(171,177,188)
@@ -173,7 +180,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.setShadowLayer(1.5f*density,0f,1.5f*density,0x50000000)
             c.drawRoundRect(key.rect,5*density,5*density,paint)
             paint.clearShadowLayer()
-            paint.color=if(dark) Color.WHITE else Color.rgb(23,25,31)
+            paint.color=if(pressed===key) Color.WHITE else if(dark) Color.WHITE else Color.rgb(23,25,31)
             paint.textAlign=Paint.Align.CENTER
             paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
             paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 23)*density
@@ -185,7 +192,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             c.drawText(text,key.rect.centerX(),cy,paint)
         }
         if(swipeActive && swipePoints.size>1 && prefs.getBoolean("swipe_trail",true)) {
-            paint.color=if(dark) Color.rgb(135,190,255) else Color.rgb(44,112,225)
+            paint.color=accent()
             paint.style=Paint.Style.STROKE
             paint.strokeWidth=4f*density
             paint.strokeCap=Paint.Cap.ROUND
