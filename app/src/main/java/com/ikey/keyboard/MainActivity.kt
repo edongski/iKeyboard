@@ -22,7 +22,7 @@ class MainActivity : Activity() {
         fun label(s: String, size: Float) = TextView(this).apply { text=s; textSize=size; setTextColor(Color.rgb(30,30,35)); setPadding(0,12,0,12) }
         fun button(s: String, action: () -> Unit) = Button(this).apply { text=s; setOnClickListener { action() } }
         layout.addView(label("iKey Keyboard", 30f))
-        layout.addView(label("Phase 6 • Comfort & Accessibility", 16f))
+        layout.addView(label("Enhanced Keyboard • Phase 6+", 16f))
         layout.addView(label("1. Enable iKey in Android keyboard settings.\n2. Select iKey as your keyboard.\n3. Test typing below.", 15f))
         layout.addView(button("1  ENABLE KEYBOARD") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
         layout.addView(button("2  SELECT KEYBOARD") { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() })
@@ -101,6 +101,27 @@ class MainActivity : Activity() {
         }
         layout.addView(keyHeight)
         layout.addView(label("Long-press a/e/i/o/u/n/c for accents. Long-press backspace to delete a word. Keyboard height updates when the keyboard reopens.",13f))
+        layout.addView(label("Expanded keyboard features",18f))
+        fun toggleSetting(title:String,key:String,default:Boolean) {
+            layout.addView(Switch(this).apply {
+                text=title; textSize=16f
+                isChecked=prefs.getBoolean(key,default)
+                setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean(key,checked).apply() }
+            })
+        }
+        toggleSetting("Auto-capitalize sentences","auto_caps",true)
+        toggleSetting("Double-space inserts a period","double_space_period",true)
+        toggleSetting("Learn words locally (opt-in)","learn_words",false)
+        toggleSetting("Save clipboard history locally (opt-in)","clipboard_history_enabled",false)
+        layout.addView(button("CLEAR LEARNED WORDS") {
+            prefs.edit().remove("learned_words").apply()
+            Toast.makeText(this,"Learned words cleared",Toast.LENGTH_SHORT).show()
+        })
+        layout.addView(button("CLEAR CLIPBOARD HISTORY") {
+            prefs.edit().remove("clipboard_history").apply()
+            Toast.makeText(this,"Clipboard history cleared",Toast.LENGTH_SHORT).show()
+        })
+        layout.addView(label("Clipboard history saves up to 9 items only when you tap SAVE in the clipboard panel. Saved clips stay on this device until deleted. Never save passwords or sensitive text.",13f))
         layout.addView(label("Touch detection mode", 18f))
         val modes = arrayOf("Classic","Smart","Adaptive")
         val spinner = Spinner(this)
@@ -140,7 +161,7 @@ class MainActivity : Activity() {
         layout.addView(label("Touch settings apply when the keyboard next opens. Drag sideways on the spacebar to move the cursor.", 13f))
         layout.addView(label("Try your keyboard:", 17f))
         layout.addView(EditText(this).apply { hint="Tap here and start typing"; minLines=3; gravity=Gravity.TOP; inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE })
-        layout.addView(label("Phase 6: adjustable key height, vibration toggle, swipe trail toggle, long-press accented characters, and delete-word gesture. Previous phases remain available.", 13f))
+        layout.addView(label("Expanded: larger offline dictionary, emoji pages, opt-in local vocabulary learning, opt-in clipboard history, auto-capitalization, and double-space punctuation. Swipe recognition and prediction remain approximate and require device testing.", 13f))
         setContentView(ScrollView(this).apply { addView(layout) })
     }
 }
