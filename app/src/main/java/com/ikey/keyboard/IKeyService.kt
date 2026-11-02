@@ -12,6 +12,36 @@ class IKeyService : InputMethodService() {
     private var caps = false
     private var symbols = false
     private var numeric = false
+    private var suggestionsAllowed = true
+    private val prefs by lazy { getSharedPreferences("ikey", MODE_PRIVATE) }
+    private fun learned():Set<String> = prefs.getStringSet("learned_words",emptySet()) ?: emptySet()
+    private fun contextWords():Pair<String,String> {
+        val text=currentInputConnection?.getTextBeforeCursor(90,0)?.toString().orEmpty()
+        val match=Regex("[\\p{L}']+$").find(text)
+        val prefix=match?.value.orEmpty()
+        val before=text.dropLast(prefix.length).trimEnd()
+        val previous=Regex("[\\p{L}']+").findAll(before).lastOrNull()?.value.orEmpty()
+        return prefix to previous
+    }
+    private fun updateSuggestions() {
+        if(!suggestionsAllowed || numeric || symbols || !prefs.getBoolean("predictions",true)) {
+            keyboard?.setSuggestions(emptyList()); return
+        }
+        val (prefix,previous)=contextWords()
+        keyboard?.setSuggestions(WordSuggestions.candidates(prefix,previous,learned()))
+    }
+    private fun commitSeparator(separator:String) {
+        val ic=currentInputConnection ?: return
+        val (prefix,_)=contextWords()
+        if(prefix.isNotBlank() && prefs.getBoolean("autocorrect",true) && suggestionsAllowed) {
+            val replacement=WordSuggestions.correction(prefix,learned())
+            if(replacement!=null && replacement!=prefix.lowercase()) {
+                ic.deleteSurroundingText(prefix.length,0)
+                ic.commitText(if(prefix.first().isUpperCase()) replacement.replaceFirstChar { it.uppercase() } else replacement,1)
+            }
+        }
+        ic.commitText(separator,1)
+    }
     override fun onCreateInputView(): View {
         keyboard = IKeyView(this) { key -> handle(key) }
         refresh()
@@ -22,18 +52,36 @@ class IKeyService : InputMethodService() {
         shifted = false; caps = false; symbols = false
         val type = attribute?.inputType ?: 0
         numeric = (type and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_NUMBER || (type and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_PHONE || (type and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_DATETIME
+        val variation=type and InputType.TYPE_MASK_VARIATION
+        suggestionsAllowed = (type and InputType.TYPE_MASK_CLASS)==InputType.TYPE_CLASS_TEXT &&
+            variation!=InputType.TYPE_TEXT_VARIATION_PASSWORD &&
+            variation!=InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD &&
+            variation!=InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD &&
+            (type and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)==0
         refresh()
     }
-    private fun refresh() { keyboard?.update(symbols, shifted || caps, numeric, getSharedPreferences("ikey", MODE_PRIVATE).getBoolean("dark",false)) }
+    private fun refresh() { keyboard?.update(symbols, shifted || caps, numeric, prefs.getBoolean("dark",false)); updateSuggestions() }
     private fun handle(key: String) {
         val ic = currentInputConnection ?: return
+        if(key.startsWith("SUGGEST:")) {
+            val suggestion=key.removePrefix("SUGGEST:")
+            val (prefix,_)=contextWords()
+            if(suggestionsAllowed && suggestion.isNotBlank()) {
+                if(prefix.isNotEmpty()) ic.deleteSurroundingText(prefix.length,0)
+                ic.commitText(suggestion+" ",1)
+                updateSuggestions()
+            }
+            return
+        }
         if(key.startsWith("SWIPE_WORD:")) {
             val word=key.removePrefix("SWIPE_WORD:")
             if(word.isNotBlank()) {
                 val value=if(shifted || caps) word.replaceFirstChar { it.uppercase() } else word
                 ic.commitText(value+" ",1)
                 if(shifted && !caps) { shifted=false; refresh() }
+                updateSuggestions()
             }
+            updateSuggestions()
             return
         }
         if (key.startsWith("CURSOR_LEFT:") || key.startsWith("CURSOR_RIGHT:")) {
@@ -48,20 +96,22 @@ class IKeyService : InputMethodService() {
         }
         when(key) {
             "⇧" -> { if (shifted) { caps = !caps; shifted = caps } else shifted = true; refresh() }
-            "⌫" -> { val selected=ic.getSelectedText(0); if (!selected.isNullOrEmpty()) ic.commitText("",1) else ic.deleteSurroundingTextInCodePoints(1,0) }
+            "⌫" -> { val selected=ic.getSelectedText(0); if (!selected.isNullOrEmpty()) ic.commitText("",1) else ic.deleteSurroundingTextInCodePoints(1,0); updateSuggestions() }
             "?123" -> { symbols = true; refresh() }
             "ABC" -> { symbols = false; numeric = false; refresh() }
             "#+=" -> { symbols = true; refresh() }
-            "space" -> ic.commitText(" ",1)
+            "space" -> { commitSeparator(" "); updateSuggestions() }
             "↵" -> {
                 val action = currentInputEditorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION) ?: EditorInfo.IME_ACTION_NONE
                 if (action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED) ic.performEditorAction(action)
-                else ic.commitText("\n",1)
+                else commitSeparator("\n")
+                updateSuggestions()
             }
             "🌐" -> switchToNextInputMethod(false)
             else -> {
                 ic.commitText(if (!symbols && (shifted || caps)) key.uppercase() else key,1)
                 if (shifted && !caps && !symbols) { shifted = false; refresh() }
+                updateSuggestions()
             }
         }
     }
