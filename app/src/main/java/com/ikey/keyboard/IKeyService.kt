@@ -27,6 +27,15 @@ class IKeyService : InputMethodService() {
     private fun refresh() { keyboard?.update(symbols, shifted || caps, numeric, getSharedPreferences("ikey", MODE_PRIVATE).getBoolean("dark",false)) }
     private fun handle(key: String) {
         val ic = currentInputConnection ?: return
+        if(key.startsWith("SWIPE_WORD:")) {
+            val word=key.removePrefix("SWIPE_WORD:")
+            if(word.isNotBlank()) {
+                val value=if(shifted || caps) word.replaceFirstChar { it.uppercase() } else word
+                ic.commitText(value+" ",1)
+                if(shifted && !caps) { shifted=false; refresh() }
+            }
+            return
+        }
         if (key.startsWith("CURSOR_LEFT:") || key.startsWith("CURSOR_RIGHT:")) {
             val right = key.startsWith("CURSOR_RIGHT:")
             val count = key.substringAfter(":").toIntOrNull()?.coerceIn(1,20) ?: return
