@@ -59,7 +59,6 @@ class IKeyService : InputMethodService() {
     private fun commitSeparator(separator:String) {
         val ic=currentInputConnection ?: return
         val (prefix,_)=contextWords()
-        rememberWord(prefix)
         if(prefix.isNotBlank() && suggestionsAllowed) {
             val shortcut=prefs.getString("shortcuts","").orEmpty().lineSequence().mapNotNull {
                 val parts=it.split("=",limit=2)
@@ -76,8 +75,10 @@ class IKeyService : InputMethodService() {
             if(replacement!=null && replacement!=prefix.lowercase()) {
                 ic.deleteSurroundingText(prefix.length,0)
                 ic.commitText(if(prefix.first().isUpperCase()) replacement.replaceFirstChar { it.uppercase() } else replacement,1)
+                rememberWord(replacement)
             }
         }
+        if(prefix.isNotBlank() && WordSuggestions.correction(prefix,learned())==null) rememberWord(prefix)
         ic.commitText(separator,1)
         updateAutoCapitalization()
     }
