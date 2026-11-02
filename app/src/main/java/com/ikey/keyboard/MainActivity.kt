@@ -20,6 +20,14 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(247, 247, 250))
         }
         fun label(s: String, size: Float) = TextView(this).apply { text=s; textSize=size; setTextColor(Color.rgb(30,30,35)); setPadding(0,12,0,12) }
+        fun section(title:String)=TextView(this).apply {
+            text=title.uppercase()
+            textSize=15f
+            setTextColor(Color.rgb(45,92,150))
+            setPadding(18,28,12,12)
+            setBackgroundColor(Color.rgb(231,238,247))
+            setTypeface(null,android.graphics.Typeface.BOLD)
+        }
         fun button(s: String, action: () -> Unit) = Button(this).apply { text=s; setOnClickListener { action() } }
         layout.addView(label("iKey Keyboard", 30f))
         layout.addView(button("✓  APPLY KEYBOARD CHANGES") {
@@ -27,10 +35,11 @@ class MainActivity : Activity() {
             Toast.makeText(this,"Keyboard settings applied",Toast.LENGTH_SHORT).show()
         })
         layout.addView(label("Tap Apply after changing settings. If the keyboard is open, it will refresh immediately.",13f))
-        layout.addView(label("Enhanced Keyboard • Phase 6+", 16f))
+        layout.addView(section("Setup & Activation"))
         layout.addView(label("1. Enable iKey in Android keyboard settings.\n2. Select iKey as your keyboard.\n3. Test typing below.", 15f))
         layout.addView(button("1  ENABLE KEYBOARD") { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) })
         layout.addView(button("2  SELECT KEYBOARD") { (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() })
+        layout.addView(section("Appearance & Layout"))
         val dark = Switch(this).apply {
             text="Dark keyboard theme"; textSize=16f
             isChecked=prefs.getBoolean("dark",false)
@@ -38,6 +47,7 @@ class MainActivity : Activity() {
         }
         layout.addView(dark)
 
+        layout.addView(section("Typing & Gestures"))
         layout.addView(Switch(this).apply {
             text="Enable swipe-to-type"; textSize=16f
             isChecked=prefs.getBoolean("swipe_enabled",true)
@@ -55,6 +65,7 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("number_row",checked).apply() }
         })
         layout.addView(label("When enabled, Q–P show 1–0 as small labels. Hold those letters to enter the number. Reopen the keyboard to apply.",13f))
+        layout.addView(section("Colors & Fonts"))
         layout.addView(label("Keyboard accent color",15f))
         val accentOptions=arrayOf("Blue","Purple","Green","Orange","Pink")
         val accentSpinner=Spinner(this)
@@ -67,13 +78,14 @@ class MainActivity : Activity() {
             }
         }
         layout.addView(accentSpinner)
-        layout.addView(label("Keyboard font styles — 20 Android font options with live preview",18f))
+        layout.addView(label("Keyboard font styles (20 options)",16f))
         val fontNames=arrayOf("Default Sans","Sans Light","Sans Thin","Sans Medium","Sans Bold","Sans Black","Sans Condensed","Condensed Light","Condensed Medium","Condensed Bold","Sans Serif","Serif","Serif Bold","Serif Italic","Monospace","Casual","Cursive","Small Caps","Rounded","Elegant Serif")
         val fontFamilies=arrayOf("sans-serif","sans-serif-light","sans-serif-thin","sans-serif-medium","sans-serif-bold","sans-serif-black","sans-serif-condensed","sans-serif-condensed-light","sans-serif-condensed-medium","sans-serif-condensed-bold","sans-serif","serif","serif","serif","monospace","casual","cursive","sans-serif-smallcaps","sans-serif-rounded","serif")
         val fontStyles=intArrayOf(0,0,0,0,0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0)
         val fontPreview=TextView(this).apply {
-            text="Aa Bb Cc 123 • The quick brown fox • Kumusta!"
-            textSize=23f
+            text="abcdefghijklmnopqrstuvwxyz\\n12345678910"
+            textSize=15f
+            maxLines=2
             setPadding(8,18,8,18)
             setTextColor(Color.rgb(28,30,36))
         }
@@ -108,8 +120,9 @@ class MainActivity : Activity() {
         layout.addView(fontSpinner)
         layout.addView(fontPreview)
         layout.addView(label("These use publicly available Android font families; availability varies by device. Unsupported families fall back to a system font. Tap Apply Keyboard Changes to update the keyboard.",13f))
+        layout.addView(section("Predictions & Language"))
         layout.addView(label("Predictions are OFF by default. Turn them on below if wanted.",13f))
-        layout.addView(label("Phase 4: Suggestions and autocorrect",18f))
+
         layout.addView(Switch(this).apply {
             text="Show word suggestions"; textSize=16f
             isChecked=prefs.getBoolean("predictions",false)
@@ -121,7 +134,7 @@ class MainActivity : Activity() {
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("autocorrect",checked).apply() }
         })
         layout.addView(label("Suggestions are processed offline using bundled open-license English and Filipino wordlists. Predictions are disabled in password fields.",13f))
-        layout.addView(label("Phase 5: Keyboard layout and shortcuts",18f))
+        layout.addView(section("One-handed Mode & Shortcuts"))
         val handOptions=arrayOf("Off","Left","Right")
         val handSpinner=Spinner(this)
         handSpinner.adapter=ArrayAdapter(this,android.R.layout.simple_spinner_dropdown_item,handOptions)
