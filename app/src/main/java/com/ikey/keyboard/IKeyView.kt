@@ -202,7 +202,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         val accessories=listOf("😊","📋","📖","🌐")
         paint.color=if(dark) Color.WHITE else Color.rgb(35,38,44)
         paint.textAlign=Paint.Align.CENTER
-        paint.typeface=Typeface.create(prefs.getString("keyboard_font","sans-serif") ?: "sans-serif",Typeface.NORMAL)
+        paint.typeface=Typeface.create(prefs.getString("keyboard_font","sans-serif") ?: "sans-serif",prefs.getInt("keyboard_font_style",0))
         paint.textSize=23f*density
         accessories.forEachIndexed { i, symbol ->
             val center=width*(i+0.5f)/4f
@@ -223,7 +223,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.clearShadowLayer()
             paint.color=if(pressed===key) Color.WHITE else if(dark) Color.WHITE else Color.rgb(23,25,31)
             paint.textAlign=Paint.Align.CENTER
-            paint.typeface=Typeface.create(prefs.getString("keyboard_font","sans-serif") ?: "sans-serif",Typeface.NORMAL)
+            paint.typeface=Typeface.create(prefs.getString("keyboard_font","sans-serif") ?: "sans-serif",prefs.getInt("keyboard_font_style",0))
             paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 25)*density
             val text=if(clipboardMode && key.text.startsWith("CLIP:")) {
                 val index=key.text.substringAfter(":").toIntOrNull() ?: -1
