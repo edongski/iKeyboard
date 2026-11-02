@@ -8,24 +8,9 @@ import kotlin.math.abs
  * No typed text or gestures leave the device.
  */
 object SwipeDecoder {
-    private val words = ("""
-the of and to in is you that it he was for on are as with his they i at be this have from
-or one had by word but not what all were we when your can said there use an each which
-she do how their if will up other about out many then them these so some her would make
-like him into time has look two more write go see number no way could people my than
-first water been call who oil its now find long down day did get come made may part
-hello hi hey thanks thank please yes good morning afternoon evening night today tomorrow
-yesterday keyboard phone android iphone swipe typing quick brown fox jumps over lazy dog
-how are you doing where when why what who can will should would could love great nice
-happy birthday congratulations welcome friend family work home school office meeting
-message email send receive okay ok sure later soon see take care sorry excuse me
-filipino tagalog taglish kumusta kamusta salamat po opo oo hindi ako ikaw tayo kami kayo
-sila siya siya naman na nga ba pa lang kasi sana sige ingat mahal kita ko mo niya nila
-natin namin inyong ating magandang umaga hapon gabi tanghali araw bukas kahapon
-tara kain tayo na dito doon saan bakit paano kailan sino ano meron wala mayroon
-pwede puwede gusto ayoko ayaw kailangan talaga sobra masarap pagkain tubig kanin
-bahay trabaho pera pamilya kaibigan mahal kita miss na kita mamaya sandali ngayon
-""").trim().split(Regex("\\s+")).filter { it.length>=2 }.distinct()
+    private val words by lazy { WordSuggestions.vocabulary.filter { it.length in 2..24 && it.all { ch -> ch in 'a'..'z' } } }
+    private val indexed by lazy { words.groupBy { it.first() to it.last() } }
+    private val lastPath = ThreadLocal<String>()
     private fun compact(s: String): String {
         val out=StringBuilder()
         for(c in s.lowercase()) if(c in 'a'..'z' && (out.isEmpty() || out.last()!=c)) out.append(c)
@@ -46,30 +31,25 @@ bahay trabaho pera pamilya kaibigan mahal kita miss na kita mamaya sandali ngayo
         }
         return prev[b.length]
     }
-    fun alternatives(raw:String, learned:Collection<String> = emptyList()):List<String> {
+    private fun ranked(raw:String, learned:Collection<String>):List<Pair<String,Int>> {
         val path=compact(raw)
         if(path.length<2) return emptyList()
-        return (learned+words).asSequence().distinct().filter {
-            val candidate=compact(it)
-            candidate.isNotEmpty() && candidate.first()==path.first() &&
-            candidate.last()==path.last() && abs(candidate.length-path.length)<=4
-        }.map { it to distance(path,compact(it)) }
-         .filter { it.second<=maxOf(2,path.length/3) }
-         .sortedWith(compareBy<Pair<String,Int>> { it.second }.thenBy { abs(it.first.length-path.length) })
-         .map { it.first }.take(3).toList()
+        val pool=indexed[path.first() to path.last()].orEmpty() +
+            learned.filter { it.length>=2 && it.firstOrNull()==path.first() && it.lastOrNull()==path.last() }
+        return pool.asSequence().distinct().filter { abs(compact(it).length-path.length)<=maxOf(5,path.length/2) }
+            .map { word ->
+                val shape=compact(word)
+                val edit=distance(path,shape)
+                val subsequence=shape.fold(0) { index,ch ->
+                    if(index<path.length && path.indexOf(ch,index)>=0) path.indexOf(ch,index)+1 else index
+                }
+                val penalty=if(subsequence==0) 2 else 0
+                word to (edit*3+abs(shape.length-path.length)+penalty)
+            }.sortedWith(compareBy<Pair<String,Int>> { it.second }.thenBy { it.first.length })
+            .take(3).toList()
     }
-    fun decode(raw:String):String? {
-        val path=compact(raw)
-        if(path.length<2) return null
-        val exact=words.firstOrNull { compact(it)==path }
-        if(exact!=null) return exact
-        return words.asSequence().filter {
-            val candidate=compact(it)
-            candidate.firstOrNull()==path.firstOrNull() &&
-            candidate.lastOrNull()==path.lastOrNull() &&
-            abs(candidate.length-path.length)<=3
-        }.map { it to distance(path,compact(it)) }
-         .minWithOrNull(compareBy<Pair<String,Int>> { it.second }.thenBy { abs(it.first.length-path.length) })
-         ?.takeIf { it.second<=maxOf(1,path.length/3) }?.first
-    }
+    fun alternatives(raw:String, learned:Collection<String> = emptyList()):List<String> =
+        ranked(raw,learned).map { it.first }
+    fun decode(raw:String, learned:Collection<String> = emptyList()):String? =
+        ranked(raw,learned).firstOrNull()?.first
 }
