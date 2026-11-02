@@ -38,7 +38,7 @@ class MainActivity : Activity() {
             isChecked=prefs.getBoolean("swipe_enabled",true)
             setOnCheckedChangeListener { _,checked -> prefs.edit().putBoolean("swipe_enabled",checked).apply() }
         })
-        layout.addView(label("Swipe across letters to enter common English and Filipino words. The starter dictionary is limited and runs offline.", 13f))
+        layout.addView(label("Swipe across letters for offline English and Filipino word recognition. Suggestions update as you type.", 13f))
         layout.addView(Switch(this).apply {
             text="Show numbers above QWERTY letters"; textSize=16f
             isChecked=prefs.getBoolean("number_hints",false)
@@ -105,20 +105,20 @@ class MainActivity : Activity() {
             isChecked=prefs.getBoolean("swipe_trail",true)
             setOnCheckedChangeListener { _,enabled -> prefs.edit().putBoolean("swipe_trail",enabled).apply() }
         })
-        layout.addView(label("Key height (42–72 dp)",15f))
+        layout.addView(label("Key height (38–90 dp) — or drag the keyboard top handle",15f))
         val keyHeight=SeekBar(this).apply {
-            max=30
-            progress=prefs.getInt("key_height",53).coerceIn(42,72)-42
+            max=52
+            progress=prefs.getInt("key_height",53).coerceIn(38,90)-38
             setOnSeekBarChangeListener(object:SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(bar:SeekBar?,progress:Int,fromUser:Boolean) {
-                    if(fromUser) prefs.edit().putInt("key_height",progress+42).apply()
+                    if(fromUser) prefs.edit().putInt("key_height",progress+38).apply()
                 }
                 override fun onStartTrackingTouch(bar:SeekBar?) {}
                 override fun onStopTrackingTouch(bar:SeekBar?) {}
             })
         }
         layout.addView(keyHeight)
-        layout.addView(label("Long-press a/e/i/o/u/n/c for accents. Long-press backspace to delete a word. Keyboard height updates when the keyboard reopens.",13f))
+        layout.addView(label("Long-press a/e/i/o/u/n/c for accents. Long-press backspace to delete a word. Drag the small handle above suggestions up or down to resize the keyboard immediately.",13f))
         layout.addView(label("Expanded keyboard features",18f))
         fun toggleSetting(title:String,key:String,default:Boolean) {
             layout.addView(Switch(this).apply {
