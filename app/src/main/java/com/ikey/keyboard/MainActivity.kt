@@ -67,6 +67,47 @@ class MainActivity : Activity() {
             }
         }
         layout.addView(accentSpinner)
+        layout.addView(label("Keyboard font styles — 20 Android font options with live preview",18f))
+        val fontNames=arrayOf("Default Sans","Sans Light","Sans Thin","Sans Medium","Sans Bold","Sans Black","Sans Condensed","Condensed Light","Condensed Medium","Condensed Bold","Sans Serif","Serif","Serif Bold","Serif Italic","Monospace","Casual","Cursive","Small Caps","Rounded","Elegant Serif")
+        val fontFamilies=arrayOf("sans-serif","sans-serif-light","sans-serif-thin","sans-serif-medium","sans-serif-bold","sans-serif-black","sans-serif-condensed","sans-serif-condensed-light","sans-serif-condensed-medium","sans-serif-condensed-bold","sans-serif","serif","serif","serif","monospace","casual","cursive","sans-serif-smallcaps","sans-serif-rounded","serif")
+        val fontStyles=intArrayOf(0,0,0,0,0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0)
+        val fontPreview=TextView(this).apply {
+            text="Aa Bb Cc 123 • The quick brown fox • Kumusta!"
+            textSize=23f
+            setPadding(8,18,8,18)
+            setTextColor(Color.rgb(28,30,36))
+        }
+        val fontSpinner=Spinner(this)
+        fontSpinner.adapter=object:ArrayAdapter<String>(this,android.R.layout.simple_spinner_item,fontNames) {
+            override fun getView(position:Int,convertView:android.view.View?,parent:android.view.ViewGroup):android.view.View {
+                val view=super.getView(position,convertView,parent) as TextView
+                view.typeface=android.graphics.Typeface.create(fontFamilies[position],fontStyles[position])
+                view.textSize=17f
+                return view
+            }
+            override fun getDropDownView(position:Int,convertView:android.view.View?,parent:android.view.ViewGroup):android.view.View {
+                val view=super.getDropDownView(position,convertView,parent) as TextView
+                view.typeface=android.graphics.Typeface.create(fontFamilies[position],fontStyles[position])
+                view.textSize=18f
+                view.setPadding(22,18,10,18)
+                return view
+            }
+        }
+        val savedFont=prefs.getString("keyboard_font","sans-serif")
+        val savedStyle=prefs.getInt("keyboard_font_style",0)
+        val selected=fontFamilies.indices.indexOfFirst { fontFamilies[it]==savedFont && fontStyles[it]==savedStyle }.coerceAtLeast(0)
+        fontSpinner.setSelection(selected)
+        fontPreview.typeface=android.graphics.Typeface.create(fontFamilies[selected],fontStyles[selected])
+        fontSpinner.onItemSelectedListener=object:android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent:android.widget.AdapterView<*>?) {}
+            override fun onItemSelected(parent:android.widget.AdapterView<*>?,view:android.view.View?,position:Int,id:Long) {
+                fontPreview.typeface=android.graphics.Typeface.create(fontFamilies[position],fontStyles[position])
+                prefs.edit().putString("keyboard_font",fontFamilies[position]).putInt("keyboard_font_style",fontStyles[position]).apply()
+            }
+        }
+        layout.addView(fontSpinner)
+        layout.addView(fontPreview)
+        layout.addView(label("These use publicly available Android font families; availability varies by device. Unsupported families fall back to a system font. Tap Apply Keyboard Changes to update the keyboard.",13f))
         layout.addView(label("Predictions are OFF by default. Turn them on below if wanted.",13f))
         layout.addView(label("Phase 4: Suggestions and autocorrect",18f))
         layout.addView(Switch(this).apply {
