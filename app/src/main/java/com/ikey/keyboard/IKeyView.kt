@@ -15,6 +15,9 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var shift = false
     private var numeric = false
     private var dark = false
+    private var suggestions: List<String> = emptyList()
+    private val barHeight = 39f * resources.displayMetrics.density
+    fun setSuggestions(items:List<String>) { suggestions=items.take(3); invalidate() }
     private var pressed: Key? = null
     private val prefs = context.getSharedPreferences("ikey", Context.MODE_PRIVATE)
     private var downX = 0f
@@ -55,7 +58,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
     override fun onMeasure(w: Int, h: Int) {
         val width = MeasureSpec.getSize(w)
-        setMeasuredDimension(width, (4*rowHeight).toInt() + (12*density).toInt())
+        setMeasuredDimension(width, (4*rowHeight+barHeight).toInt() + (12*density).toInt())
     }
     override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int) { super.onSizeChanged(w,h,oldw,oldh); rebuild(w) }
     private fun rebuild(w:Int) {
@@ -76,7 +79,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             }
             items.forEachIndexed { i, t ->
                 val width= if(row==1 && !symbols && !numeric) usable/10f else weights[i]*unit
-                val y=row*rowHeight+margin
+                val y=barHeight+row*rowHeight+margin
                 keys.add(Key(t,RectF(x+margin,y,x+width-margin,y+rowHeight-2*margin)))
                 x+=width
             }
@@ -84,6 +87,22 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     }
     override fun onDraw(c:Canvas) {
         c.drawColor(if(dark) Color.rgb(42,44,49) else Color.rgb(208,211,219))
+        paint.color=if(dark) Color.rgb(48,50,55) else Color.rgb(224,227,234)
+        c.drawRect(0f,0f,width.toFloat(),barHeight,paint)
+        if(suggestions.isNotEmpty()) {
+            suggestions.forEachIndexed { index, word ->
+                val left=index*width/3f
+                paint.color=if(dark) Color.WHITE else Color.rgb(26,30,40)
+                paint.textAlign=Paint.Align.CENTER
+                paint.typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)
+                paint.textSize=15f*density
+                c.drawText(word,left+width/6f,barHeight/2f-(paint.ascent()+paint.descent())/2f,paint)
+                if(index<2) {
+                    paint.color=if(dark) Color.DKGRAY else Color.LTGRAY
+                    c.drawRect((index+1)*width/3f-0.5f*density,7f*density,(index+1)*width/3f+0.5f*density,barHeight-7f*density,paint)
+                }
+            }
+        }
         keys.forEach { key ->
             val special=key.text in listOf("⇧","⌫","?123","ABC","↵","🌐")
             val color=when {
@@ -161,6 +180,13 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     swipeActive=false; swipePoints.clear(); swipeLetters.clear(); pressed=null
                     invalidate()
                     if(decoded!=null) onKey("SWIPE_WORD:"+decoded)
+                    performClick()
+                    return true
+                }
+                if(downY<barHeight && event.y<barHeight && suggestions.isNotEmpty()) {
+                    val index=(event.x/(width/3f)).toInt().coerceIn(0,suggestions.size-1)
+                    pressed=null; invalidate()
+                    onKey("SUGGEST:"+suggestions[index])
                     performClick()
                     return true
                 }
