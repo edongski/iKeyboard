@@ -83,7 +83,7 @@ class MainActivity : Activity() {
         val fontFamilies=arrayOf("sans-serif","sans-serif-light","sans-serif-thin","sans-serif-medium","sans-serif-bold","sans-serif-black","sans-serif-condensed","sans-serif-condensed-light","sans-serif-condensed-medium","sans-serif-condensed-bold","sans-serif","serif","serif","serif","monospace","casual","cursive","sans-serif-smallcaps","sans-serif-rounded","serif")
         val fontStyles=intArrayOf(0,0,0,0,0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0)
         val fontPreview=TextView(this).apply {
-            text="abcdefghijklmnopqrstuvwxyz\\n12345678910"
+            text="abcdefghijklmnopqrstuvwxyz\n12345678910"
             textSize=15f
             maxLines=2
             setPadding(8,18,8,18)
