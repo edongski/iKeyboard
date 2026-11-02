@@ -4,6 +4,7 @@ import android.inputmethodservice.InputMethodService
 import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.KeyEvent
 
 class IKeyService : InputMethodService() {
     private var keyboard: IKeyView? = null
@@ -26,6 +27,16 @@ class IKeyService : InputMethodService() {
     private fun refresh() { keyboard?.update(symbols, shifted || caps, numeric, getSharedPreferences("ikey", MODE_PRIVATE).getBoolean("dark",false)) }
     private fun handle(key: String) {
         val ic = currentInputConnection ?: return
+        if (key.startsWith("CURSOR_LEFT:") || key.startsWith("CURSOR_RIGHT:")) {
+            val right = key.startsWith("CURSOR_RIGHT:")
+            val count = key.substringAfter(":").toIntOrNull()?.coerceIn(1,20) ?: return
+            repeat(count) {
+                val code = if (right) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+            }
+            return
+        }
         when(key) {
             "⇧" -> { if (shifted) { caps = !caps; shifted = caps } else shifted = true; refresh() }
             "⌫" -> { val selected=ic.getSelectedText(0); if (!selected.isNullOrEmpty()) ic.commitText("",1) else ic.deleteSurroundingTextInCodePoints(1,0) }
