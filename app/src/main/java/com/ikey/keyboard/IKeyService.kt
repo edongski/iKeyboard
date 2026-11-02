@@ -17,6 +17,29 @@ class IKeyService : InputMethodService() {
     private var suggestionsAllowed = true
     private val prefs by lazy { getSharedPreferences("ikey", MODE_PRIVATE) }
     private fun learned():Set<String> = prefs.getStringSet("learned_words",emptySet()) ?: emptySet()
+    private fun rememberWord(word:String) {
+        if(!prefs.getBoolean("learn_words",false) || !suggestionsAllowed) return
+        val normalized=word.lowercase().trim()
+        if(normalized.length !in 3..24 || !normalized.all { it.isLetter() }) return
+        val updated=learned().toMutableSet()
+        if(updated.size>=500 && normalized !in updated) updated.remove(updated.first())
+        updated.add(normalized)
+        prefs.edit().putStringSet("learned_words",updated).apply()
+    }
+    private fun clipboardHistory():List<String> =
+        prefs.getString("clipboard_history","").orEmpty().split("\\u0001").filter { it.isNotEmpty() }.take(9)
+    private fun saveClipboard(value:String) {
+        if(value.isBlank() || !prefs.getBoolean("clipboard_history_enabled",false)) return
+        val updated=(listOf(value.take(1000))+clipboardHistory().filter { it!=value }).take(9)
+        prefs.edit().putString("clipboard_history",updated.joinToString("\\u0001")).apply()
+    }
+    private fun updateAutoCapitalization() {
+        if(!prefs.getBoolean("auto_caps",true) || numeric || symbols) return
+        val before=currentInputConnection?.getTextBeforeCursor(100,0)?.toString().orEmpty()
+        if(before.isBlank() || before.trimEnd().lastOrNull() in listOf('.','!','?','\\n')) {
+            if(!shifted && !caps) { shifted=true; refresh() }
+        }
+    }
     private fun contextWords():Pair<String,String> {
         val text=currentInputConnection?.getTextBeforeCursor(90,0)?.toString().orEmpty()
         val match=Regex("[\\p{L}']+$").find(text)
@@ -35,6 +58,7 @@ class IKeyService : InputMethodService() {
     private fun commitSeparator(separator:String) {
         val ic=currentInputConnection ?: return
         val (prefix,_)=contextWords()
+        rememberWord(prefix)
         if(prefix.isNotBlank() && suggestionsAllowed) {
             val shortcut=prefs.getString("shortcuts","").orEmpty().lineSequence().mapNotNull {
                 val parts=it.split("=",limit=2)
@@ -54,6 +78,7 @@ class IKeyService : InputMethodService() {
             }
         }
         ic.commitText(separator,1)
+        updateAutoCapitalization()
     }
     override fun onCreateInputView(): View {
         keyboard = IKeyView(this) { key -> handle(key) }
@@ -72,6 +97,7 @@ class IKeyService : InputMethodService() {
             variation!=InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD &&
             (type and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)==0
         refresh()
+        updateAutoCapitalization()
     }
     private fun refresh() { keyboard?.update(symbols, shifted || caps, numeric, prefs.getBoolean("dark",false)); updateSuggestions() }
     private fun handle(key: String) {
@@ -100,11 +126,39 @@ class IKeyService : InputMethodService() {
             }
             return
         }
+        if(key=="DOUBLE_SPACE_PERIOD") {
+            val previous=ic.getTextBeforeCursor(1,0)?.toString().orEmpty()
+            if(previous==" ") { ic.deleteSurroundingText(1,0); ic.commitText(". ",1) }
+            else ic.commitText(" ",1)
+            updateAutoCapitalization(); updateSuggestions(); return
+        }
+        if(key=="◀" || key=="▶") { keyboard?.nextEmojiPage(if(key=="▶") 1 else -1); return }
+        if(key.startsWith("CLIP:")) {
+            val index=key.substringAfter(":").toIntOrNull() ?: return
+            val value=clipboardHistory().getOrNull(index) ?: return
+            ic.commitText(value,1); keyboard?.showLetters(); updateSuggestions(); return
+        }
+        if(key=="SAVE") {
+            val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip=clipboard.primaryClip
+            val value=if(clip!=null && clip.itemCount>0) clip.getItemAt(0).coerceToText(this).toString() else ""
+            saveClipboard(value); keyboard?.setClipboardItems(clipboardHistory()); return
+        }
+        if(key=="DELETE CLIP") {
+            val updated=clipboardHistory().drop(1)
+            prefs.edit().putString("clipboard_history",updated.joinToString("\\u0001")).apply()
+            keyboard?.setClipboardItems(updated); return
+        }
+        if(key=="CLEAR ALL") {
+            prefs.edit().remove("clipboard_history").apply()
+            keyboard?.setClipboardItems(emptyList()); return
+        }
         if(key.startsWith("SWIPE_WORD:")) {
             val word=key.removePrefix("SWIPE_WORD:")
             if(word.isNotBlank()) {
                 val value=if(shifted || caps) word.replaceFirstChar { it.uppercase() } else word
                 ic.commitText(value+" ",1)
+                rememberWord(value)
                 if(shifted && !caps) { shifted=false; refresh() }
                 updateSuggestions()
             }
@@ -125,9 +179,7 @@ class IKeyService : InputMethodService() {
             "😊" -> keyboard?.showEmoji()
             "📋" -> {
                 if(!suggestionsAllowed) return
-                val clipboard=getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val preview=if(clipboard.hasPrimaryClip()) "Ready to paste" else "Empty"
-                keyboard?.setClipboardPreview(preview)
+                keyboard?.setClipboardItems(clipboardHistory())
             }
             "PASTE" -> {
                 if(!suggestionsAllowed) return
@@ -135,7 +187,10 @@ class IKeyService : InputMethodService() {
                 val clip=clipboard.primaryClip
                 val item=if(clip!=null && clip.itemCount>0) clip.getItemAt(0) else null
                 val value=item?.coerceToText(this)?.toString()
-                if(!value.isNullOrEmpty()) ic.commitText(value.take(10000),1)
+                if(!value.isNullOrEmpty()) {
+                    ic.commitText(value.take(10000),1)
+                    saveClipboard(value)
+                }
                 keyboard?.showLetters(); updateSuggestions()
             }
             "CLEAR" -> { keyboard?.showLetters(); updateSuggestions() }
