@@ -15,6 +15,7 @@ class IKeyService : InputMethodService() {
     private var symbols = false
     private var numeric = false
     private var suggestionsAllowed = true
+    private var lastSwipeWord:String? = null
     private val prefs by lazy { getSharedPreferences("ikey", MODE_PRIVATE) }
     private fun learned():Set<String> = prefs.getStringSet("learned_words",emptySet()) ?: emptySet()
     private fun rememberWord(word:String) {
@@ -117,6 +118,15 @@ class IKeyService : InputMethodService() {
             return
         }
         if(key.startsWith("SUGGEST:")) {
+            val swipe=lastSwipeWord
+            if(swipe!=null) {
+                val before=ic.getTextBeforeCursor(swipe.length+1,0)?.toString().orEmpty()
+                if(before.endsWith(swipe+" ")) {
+                    ic.deleteSurroundingText(swipe.length+1,0)
+                    ic.commitText(key.removePrefix("SUGGEST:")+" ",1)
+                    lastSwipeWord=null; updateSuggestions(); return
+                }
+            }
             val suggestion=key.removePrefix("SUGGEST:")
             val (prefix,_)=contextWords()
             if(suggestionsAllowed && suggestion.isNotBlank()) {
@@ -158,6 +168,7 @@ class IKeyService : InputMethodService() {
             if(word.isNotBlank()) {
                 val value=if(shifted || caps) word.replaceFirstChar { it.uppercase() } else word
                 ic.commitText(value+" ",1)
+                lastSwipeWord=value
                 rememberWord(value)
                 if(shifted && !caps) { shifted=false; refresh() }
                 updateSuggestions()
@@ -175,6 +186,7 @@ class IKeyService : InputMethodService() {
             }
             return
         }
+        if(key!="😊" && key!="📋") lastSwipeWord=null
         when(key) {
             "😊" -> { if(keyboard?.isEmojiMode()==true) { ic.commitText("😊",1); updateSuggestions() } else keyboard?.showEmoji() }
             "📋" -> {
