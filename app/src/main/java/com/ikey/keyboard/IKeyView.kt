@@ -21,6 +21,16 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var downY = 0f
     private var spaceDrag = false
     private var cursorSteps = 0
+    private val swipePoints = mutableListOf<PointF>()
+    private val swipeLetters = StringBuilder()
+    private var swipeActive = false
+    private fun swipeEnabled() = prefs.getBoolean("swipe_enabled",true)
+    private fun addSwipePoint(x:Float,y:Float) {
+        if(swipePoints.size<600) swipePoints.add(PointF(x,y))
+        val hit=smartHit(x,y)?.text
+        if(hit!=null && hit.length==1 && hit[0] in 'a'..'z' &&
+            (swipeLetters.isEmpty() || swipeLetters.last().toString()!=hit)) swipeLetters.append(hit)
+    }
     private fun smartHit(x: Float, y: Float): Key? {
         if (keys.isEmpty()) return null
         val px = x - prefs.getInt("offset_x",0).coerceIn(-30,30)*density
@@ -95,7 +105,18 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             val cy=key.rect.centerY()-(paint.ascent()+paint.descent())/2
             c.drawText(text,key.rect.centerX(),cy,paint)
         }
-        pressed?.takeIf { it.text.length==1 && !numeric }?.let { key ->
+        if(swipeActive && swipePoints.size>1) {
+            paint.color=if(dark) Color.rgb(135,190,255) else Color.rgb(44,112,225)
+            paint.style=Paint.Style.STROKE
+            paint.strokeWidth=4f*density
+            paint.strokeCap=Paint.Cap.ROUND
+            val trail=Path()
+            trail.moveTo(swipePoints[0].x,swipePoints[0].y)
+            for(i in 1 until swipePoints.size) trail.lineTo(swipePoints[i].x,swipePoints[i].y)
+            c.drawPath(trail,paint)
+            paint.style=Paint.Style.FILL
+        }
+        pressed?.takeIf { it.text.length==1 && !numeric && !swipeActive }?.let { key ->
             val r=RectF(key.rect.left-5*density,key.rect.top-48*density,key.rect.right+5*density,key.rect.top+3*density)
             paint.color=if(dark) Color.rgb(100,103,110) else Color.WHITE
             c.drawRoundRect(r,8*density,8*density,paint)
@@ -109,6 +130,8 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         when(event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX=event.x; downY=event.y; spaceDrag=false; cursorSteps=0
+                swipeActive=false; swipePoints.clear(); swipeLetters.clear()
+                if(swipeEnabled() && !symbols && !numeric) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
                 invalidate(); return true
             }
@@ -120,12 +143,27 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     if(delta>0) onKey("CURSOR_RIGHT:" + delta)
                     if(delta<0) onKey("CURSOR_LEFT:" + (-delta))
                     cursorSteps+=delta
+                } else if(!spaceDrag && swipeEnabled() && !symbols && !numeric &&
+                    pressed?.text?.length==1 && pressed?.text?.firstOrNull() in 'a'..'z' &&
+                    hypot(event.x-downX,event.y-downY)>22f*density) {
+                    swipeActive=true
+                    for(i in 0 until event.historySize) addSwipePoint(event.getHistoricalX(i),event.getHistoricalY(i))
+                    addSwipePoint(event.x,event.y)
                 } else if(!spaceDrag && hypot(event.x-downX,event.y-downY)>18f*density) {
                     pressed=smartHit(event.x,event.y) ?: pressed
                 }
                 invalidate(); return true
             }
             MotionEvent.ACTION_UP -> {
+                if(swipeActive && !spaceDrag) {
+                    addSwipePoint(event.x,event.y)
+                    val decoded=SwipeDecoder.decode(swipeLetters.toString())
+                    swipeActive=false; swipePoints.clear(); swipeLetters.clear(); pressed=null
+                    invalidate()
+                    if(decoded!=null) onKey("SWIPE_WORD:"+decoded)
+                    performClick()
+                    return true
+                }
                 val key=if(spaceDrag) null else smartHit(event.x,event.y) ?: pressed
                 pressed=null; invalidate()
                 if(key!=null && abs(event.y-downY)<rowHeight*1.4f) {
@@ -134,7 +172,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { pressed=null; spaceDrag=false; invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
         }
         return true
     }
