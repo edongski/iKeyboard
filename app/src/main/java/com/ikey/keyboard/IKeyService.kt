@@ -176,7 +176,7 @@ class IKeyService : InputMethodService() {
             return
         }
         when(key) {
-            "😊" -> keyboard?.showEmoji()
+            "😊" -> { if(keyboard?.isEmojiMode()==true) { ic.commitText("😊",1); updateSuggestions() } else keyboard?.showEmoji() }
             "📋" -> {
                 if(!suggestionsAllowed) return
                 keyboard?.setClipboardItems(clipboardHistory())
