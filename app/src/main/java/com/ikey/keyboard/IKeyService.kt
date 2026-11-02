@@ -64,7 +64,7 @@ class IKeyService : InputMethodService() {
         return prefix to previous
     }
     private fun updateSuggestions() {
-        if(!suggestionsAllowed || numeric || symbols || !prefs.getBoolean("predictions",true)) {
+        if(!suggestionsAllowed || numeric || symbols || !prefs.getBoolean("predictions",false)) {
             keyboard?.setSuggestions(emptyList()); return
         }
         val (prefix,previous)=contextWords()
@@ -241,6 +241,10 @@ class IKeyService : InputMethodService() {
         }
         if(key!="😊" && key!="📋") lastSwipeWord=null
         when(key) {
+            "📖" -> { keyboard?.showDictionary() }
+            "PERSONAL DICTIONARY" -> { keyboard?.showLetters(); startActivity(android.content.Intent(this,MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            "ADD WORD" -> { keyboard?.showLetters(); startActivity(android.content.Intent(this,MainActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            "CLEAR LEARNED" -> { prefs.edit().remove("learned_words").apply(); keyboard?.showLetters(); updateSuggestions() }
             "😊" -> { if(keyboard?.isEmojiMode()==true) { ic.commitText("😊",1); updateSuggestions() } else keyboard?.showEmoji() }
             "📋" -> {
                 if(!suggestionsAllowed) return
