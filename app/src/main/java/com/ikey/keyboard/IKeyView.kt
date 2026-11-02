@@ -15,6 +15,12 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var shift = false
     private var numeric = false
     private var dark = false
+    private var emojiMode = false
+    private var clipboardMode = false
+    private var clipboardPreview = ""
+    fun setClipboardPreview(value:String) { clipboardPreview=value.take(80); clipboardMode=true; emojiMode=false; rebuild(width); invalidate() }
+    private val emojis = listOf("😀","😂","🥰","😍","😊","😎","😭","🥺","😡","👍","👏","🙏","❤️","💕","🔥","🎉","💯","✨","👋","🤝","😅","🤔","😘","😁","😴","😇","🙌","💪","🇵🇭","🍔","☕","🎂")
+
     private var suggestions: List<String> = emptyList()
     private val barHeight = 39f * resources.displayMetrics.density
     fun setSuggestions(items:List<String>) { suggestions=items.take(3); invalidate() }
@@ -56,6 +62,8 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private val margin = 3f * density
     init { isClickable = true; setLayerType(LAYER_TYPE_SOFTWARE,null) }
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
+    fun showEmoji() { emojiMode=!emojiMode; clipboardMode=false; rebuild(width); invalidate() }
+    fun showLetters() { emojiMode=false; clipboardMode=false; rebuild(width); invalidate() }
     override fun onMeasure(w: Int, h: Int) {
         val width = MeasureSpec.getSize(w)
         setMeasuredDimension(width, (4*rowHeight+barHeight).toInt() + (12*density).toInt())
@@ -64,21 +72,32 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private fun rebuild(w:Int) {
         if(w<=0)return
         keys.clear()
-        val rows = if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
-        else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC",",","🌐","space",".","↵"))
-        else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123",",","🌐","space",".","↵"))
+        val rows = if(clipboardMode) listOf(
+            listOf("PASTE","CLEAR","ABC"),
+            listOf("Clipboard is read only when you tap 📋"),
+            listOf("ABC"),
+            listOf("ABC")
+        ) else if(emojiMode) listOf(
+            emojis.subList(0,10),emojis.subList(10,20),emojis.subList(20,30),
+            listOf("ABC","😊","❤️","😂","⌫","space","↵")
+        ) else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
+        else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC","😊","📋","🌐","space",".","↵"))
+        else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123","😊","📋","🌐","space",".","↵"))
         rows.forEachIndexed { row, items ->
-            val weights=items.map { when(it) { "space"->4.0f; "⇧","⌫","?123","ABC","↵"->1.45f; "🌐"->1.1f; else->1f } }
+            val weights=items.map { when(it) { "space"->4.0f; "⇧","⌫","?123","ABC","↵","PASTE","CLEAR"->1.45f; "🌐","😊","📋"->1.1f; else->1f } }
             val total=weights.sum()
-            val usable=w-2*margin
+            val hand=prefs.getString("one_hand","Off") ?: "Off"
+            val scale=if(hand=="Off") 1f else 0.78f
+            val usable=(w-2*margin)*scale
+            val origin=if(hand=="Right") w-margin-usable else margin
             val unit=usable/total
-            var x=margin
-            if(row==1 && !symbols && !numeric) {
+            var x=origin
+            if(row==1 && !symbols && !numeric && !emojiMode && !clipboardMode) {
                 val natural=usable/10f*9f
                 x+=(usable-natural)/2
             }
             items.forEachIndexed { i, t ->
-                val width= if(row==1 && !symbols && !numeric) usable/10f else weights[i]*unit
+                val width= if(row==1 && !symbols && !numeric && !emojiMode && !clipboardMode) usable/10f else weights[i]*unit
                 val y=barHeight+row*rowHeight+margin
                 keys.add(Key(t,RectF(x+margin,y,x+width-margin,y+rowHeight-2*margin)))
                 x+=width
@@ -89,7 +108,12 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         c.drawColor(if(dark) Color.rgb(42,44,49) else Color.rgb(208,211,219))
         paint.color=if(dark) Color.rgb(48,50,55) else Color.rgb(224,227,234)
         c.drawRect(0f,0f,width.toFloat(),barHeight,paint)
-        if(suggestions.isNotEmpty()) {
+        if(clipboardMode) {
+            paint.color=if(dark) Color.WHITE else Color.BLACK
+            paint.textSize=13f*density
+            paint.textAlign=Paint.Align.CENTER
+            c.drawText("Clipboard: "+clipboardPreview.take(32),width/2f,barHeight/2f-(paint.ascent()+paint.descent())/2f,paint)
+        } else if(suggestions.isNotEmpty()) {
             suggestions.forEachIndexed { index, word ->
                 val left=index*width/3f
                 paint.color=if(dark) Color.WHITE else Color.rgb(26,30,40)
@@ -183,7 +207,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     performClick()
                     return true
                 }
-                if(downY<barHeight && event.y<barHeight && suggestions.isNotEmpty()) {
+                if(!clipboardMode && downY<barHeight && event.y<barHeight && suggestions.isNotEmpty()) {
                     val index=(event.x/(width/3f)).toInt().coerceIn(0,suggestions.size-1)
                     pressed=null; invalidate()
                     onKey("SUGGEST:"+suggestions[index])
