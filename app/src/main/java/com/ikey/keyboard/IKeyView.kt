@@ -42,7 +42,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private val allEmojis by lazy { (emojis+extraEmojis).distinct() }
     private var suggestions: List<String> = emptyList()
     private val resizeHandleHeight = 16f * resources.displayMetrics.density
-    private val barHeight = 55f * resources.displayMetrics.density
+    private val barHeight get() = if(showPredictionBar()) 55f*density else resizeHandleHeight
     private val accessoryHeight = 45f * resources.displayMetrics.density
     private fun numberRowEnabled()=prefs.getBoolean("number_row",false)
     private fun showPredictionBar()=prefs.getBoolean("predictions",false)
@@ -182,7 +182,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.textSize=13f*density
             paint.textAlign=Paint.Align.CENTER
             c.drawText("Clipboard: "+clipboardPreview.take(32),width/2f,(barHeight-resizeHandleHeight)/2f-(paint.ascent()+paint.descent())/2f,paint)
-        } else if(showPredictionBar() && showPredictionBar() && suggestions.isNotEmpty()) {
+        } else if(showPredictionBar() && suggestions.isNotEmpty()) {
             suggestions.forEachIndexed { index, word ->
                 val left=index*width/3f
                 paint.color=if(dark) Color.WHITE else Color.rgb(26,30,40)
@@ -202,7 +202,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         val accessories=listOf("😊","📋","📖","🌐")
         paint.color=if(dark) Color.WHITE else Color.rgb(35,38,44)
         paint.textAlign=Paint.Align.CENTER
-        paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
+        paint.typeface=Typeface.create(prefs.getString("keyboard_font","sans-serif") ?: "sans-serif",Typeface.NORMAL)
         paint.textSize=23f*density
         accessories.forEachIndexed { i, symbol ->
             val center=width*(i+0.5f)/4f
@@ -223,7 +223,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.clearShadowLayer()
             paint.color=if(pressed===key) Color.WHITE else if(dark) Color.WHITE else Color.rgb(23,25,31)
             paint.textAlign=Paint.Align.CENTER
-            paint.typeface=Typeface.create("sans-serif-light",Typeface.NORMAL)
+            paint.typeface=Typeface.create(prefs.getString("keyboard_font","sans-serif") ?: "sans-serif",Typeface.NORMAL)
             paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 25)*density
             val text=if(clipboardMode && key.text.startsWith("CLIP:")) {
                 val index=key.text.substringAfter(":").toIntOrNull() ?: -1
@@ -233,6 +233,50 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             val hint=if(showNumberHints() && !symbols && !numeric && !emojiMode && !clipboardMode)
                 "qwertyuiop".indexOf(key.text).takeIf { it>=0 }?.let { if(it==9) "0" else (it+1).toString() }
                 else null
+            if(key.text in listOf("⇧","⌫","↵")) {
+                val cx=key.rect.centerX()
+                val y=key.rect.centerY()
+                paint.style=Paint.Style.STROKE
+                paint.strokeWidth=2.2f*density
+                paint.strokeCap=Paint.Cap.ROUND
+                paint.strokeJoin=Paint.Join.ROUND
+                val path=Path()
+                when(key.text) {
+                    "⇧" -> {
+                        path.moveTo(cx-12*density,y)
+                        path.lineTo(cx,y-12*density)
+                        path.lineTo(cx+12*density,y)
+                        path.lineTo(cx+6*density,y)
+                        path.lineTo(cx+6*density,y+11*density)
+                        path.lineTo(cx-6*density,y+11*density)
+                        path.lineTo(cx-6*density,y)
+                        path.close()
+                    }
+                    "⌫" -> {
+                        path.moveTo(cx-13*density,y)
+                        path.lineTo(cx-5*density,y-10*density)
+                        path.lineTo(cx+13*density,y-10*density)
+                        path.lineTo(cx+13*density,y+10*density)
+                        path.lineTo(cx-5*density,y+10*density)
+                        path.close()
+                        path.moveTo(cx-1*density,y-5*density)
+                        path.lineTo(cx+7*density,y+5*density)
+                        path.moveTo(cx+7*density,y-5*density)
+                        path.lineTo(cx-1*density,y+5*density)
+                    }
+                    else -> {
+                        path.moveTo(cx+10*density,y-9*density)
+                        path.lineTo(cx+10*density,y+3*density)
+                        path.lineTo(cx-9*density,y+3*density)
+                        path.moveTo(cx-3*density,y-3*density)
+                        path.lineTo(cx-9*density,y+3*density)
+                        path.lineTo(cx-3*density,y+9*density)
+                    }
+                }
+                c.drawPath(path,paint)
+                paint.style=Paint.Style.FILL
+                return@forEach
+            }
             if(hint!=null) {
                 paint.textSize=22f*density
                 c.drawText(text,key.rect.centerX(),cy+5f*density,paint)
