@@ -35,6 +35,17 @@ class IKeyService : InputMethodService() {
     private fun commitSeparator(separator:String) {
         val ic=currentInputConnection ?: return
         val (prefix,_)=contextWords()
+        if(prefix.isNotBlank() && suggestionsAllowed) {
+            val shortcut=prefs.getString("shortcuts","").orEmpty().lineSequence().mapNotNull {
+                val parts=it.split("=",limit=2)
+                if(parts.size==2 && parts[0].trim().isNotBlank()) parts[0].trim() to parts[1].trim() else null
+            }.firstOrNull { it.first==prefix }?.second
+            if(shortcut!=null) {
+                ic.deleteSurroundingText(prefix.length,0)
+                ic.commitText(shortcut+separator,1)
+                return
+            }
+        }
         if(prefix.isNotBlank() && prefs.getBoolean("autocorrect",true) && suggestionsAllowed) {
             val replacement=WordSuggestions.correction(prefix,learned())
             if(replacement!=null && replacement!=prefix.lowercase()) {
@@ -128,10 +139,6 @@ class IKeyService : InputMethodService() {
             }
             "🌐" -> switchToNextInputMethod(false)
             else -> {
-                val shortcuts=prefs.getString("shortcuts","").orEmpty().lineSequence().mapNotNull {
-                    val parts=it.split("=",limit=2)
-                    if(parts.size==2 && parts[0].isNotBlank()) parts[0].trim() to parts[1].trim() else null
-                }.toMap()
                 val value=if(!symbols && (shifted || caps)) key.uppercase() else key
                 ic.commitText(value,1)
                 if (shifted && !caps && !symbols) { shifted = false; refresh() }
