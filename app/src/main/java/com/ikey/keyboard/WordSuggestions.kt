@@ -105,7 +105,8 @@ mahina mabilis mabagal malaki maliit mataas mababa mahaba maikli
 bago luma tama mali totoo hindi totoo oo naman sige okay ayos
 maayos mabuti mabuhay paalam kita tayo ulit mamaya bukas
 """).trim().split(Regex("\\s+")).distinct()
-    private val vocabulary by lazy { (words+extraWords).distinct() }
+    val vocabulary:List<String> by lazy { (words+extraWords).distinct() }
+    private val byInitial by lazy { vocabulary.groupBy { it.firstOrNull() } }
     private val next = mapOf(
         "good" to listOf("morning","night","afternoon"),
         "thank" to listOf("you","you","you"),
@@ -132,7 +133,7 @@ maayos mabuti mabuhay paalam kita tayo ulit mamaya bukas
     fun candidates(prefix:String, previous:String="", learned:Collection<String> = emptyList()):List<String> {
         val p=prefix.lowercase().filter { it.isLetter() }
         if(p.isEmpty()) return (next[previous.lowercase()] ?: listOf("the","and","you")).distinct().take(3)
-        val dictionary=(learned+vocabulary).filter { it.length>=2 }.distinct()
+        val dictionary=(learned+byInitial[p.firstOrNull()].orEmpty()).filter { it.length>=2 }.distinct()
         val starts=dictionary.filter { it.startsWith(p) && it!=p }.sortedWith(compareBy<String>{it.length}.thenBy{it}).take(3)
         val corrections=if(p.length>=3) dictionary.filter { it.firstOrNull()==p.firstOrNull() && kotlin.math.abs(it.length-p.length)<=2 && it!=p }
             .map { it to distance(p,it) }.filter { it.second<=if(p.length>=6) 2 else 1 }
