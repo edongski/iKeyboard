@@ -254,9 +254,10 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 if(swipeActive && !spaceDrag) {
                     addSwipePoint(event.x,event.y)
                     val decoded=SwipeDecoder.decode(swipeLetters.toString())
+                    val alternatives=SwipeDecoder.alternatives(swipeLetters.toString())
                     swipeActive=false; swipePoints.clear(); swipeLetters.clear(); pressed=null
                     invalidate()
-                    if(decoded!=null) onKey("SWIPE_WORD:"+decoded)
+                    if(decoded!=null) { onKey("SWIPE_WORD:"+decoded); if(alternatives.size>1) setSuggestions(alternatives) }
                     performClick()
                     return true
                 }
