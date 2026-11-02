@@ -5,6 +5,27 @@ package com.ikey.keyboard
  * Designed as a starter dictionary, not a full language model.
  */
 object WordSuggestions {
+    @Volatile private var externalWords:List<String> = emptyList()
+    fun initialize(context:android.content.Context) {
+        if(externalWords.isNotEmpty()) return
+        synchronized(this) {
+            if(externalWords.isNotEmpty()) return
+            val loaded=ArrayList<String>(75000)
+            for(file in listOf("english_words.txt","filipino_words.txt")) {
+                try {
+                    context.assets.open(file).bufferedReader().useLines { lines ->
+                        lines.take(50000).forEach { word ->
+                            if(word.length in 2..24 && word.all { it in 'a'..'z' }) loaded.add(word)
+                        }
+                    }
+                } catch(e:java.io.IOException) {
+                    android.util.Log.w("iKeyboard","Optional offline dictionary unavailable: "+file,e)
+                }
+            }
+            externalWords=loaded.distinct()
+        }
+    }
+
     private val words = ("""
 the and you that this with have from your what when where there their they them then
 will would could should about after before again always because between people really
@@ -182,7 +203,7 @@ maayos mabuti mabuhay paalam kita tayo ulit mamaya bukas
     unawain unti unti-unti usap usapan uso utak utang utos uwi
     wagas wala walang walis wasto wika
     """.trim().split(Regex("\\s+")).filter { it.all { ch -> ch in 'a'..'z' } }
-    val vocabulary:List<String> by lazy { (words+extraWords+commonFilipino).distinct() }
+    val vocabulary:List<String> by lazy { (words+extraWords+commonFilipino+externalWords).distinct() }
     private val byInitial by lazy { vocabulary.groupBy { it.firstOrNull() } }
     private val correctionCache=object:LinkedHashMap<String,String?>(256,0.75f,true) {
         override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,String?>?):Boolean = size>256
