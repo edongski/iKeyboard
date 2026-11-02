@@ -24,6 +24,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     }
     private var emojiMode = false
     private var clipboardMode = false
+    private var dictionaryMode = false
     private var clipboardPreview = ""
     private var clipboardItems:List<String> = emptyList()
     private var emojiPage=0
@@ -42,6 +43,9 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var suggestions: List<String> = emptyList()
     private val resizeHandleHeight = 16f * resources.displayMetrics.density
     private val barHeight = 55f * resources.displayMetrics.density
+    private val accessoryHeight = 45f * resources.displayMetrics.density
+    private fun numberRowEnabled()=prefs.getBoolean("number_row",false)
+    private fun showPredictionBar()=prefs.getBoolean("predictions",false)
     private var resizing = false
     private var resizeStartY = 0f
     private var resizeStartHeight = 53
@@ -111,20 +115,24 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     init { isClickable = true; setLayerType(LAYER_TYPE_SOFTWARE,null) }
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
     fun showEmoji() { emojiMode=!emojiMode; clipboardMode=false; rebuild(width); invalidate() }
-    fun showLetters() { emojiMode=false; clipboardMode=false; rebuild(width); invalidate() }
+    fun showLetters() { emojiMode=false; clipboardMode=false; dictionaryMode=false; rebuild(width); invalidate() }
+    fun showDictionary() { dictionaryMode=!dictionaryMode; emojiMode=false; clipboardMode=false; rebuild(width); invalidate() }
     fun nextEmojiPage(delta:Int) { emojiPage=(emojiPage+delta+(allEmojis.size+29)/30)%((allEmojis.size+29)/30); rebuild(width); invalidate() }
     fun currentClipboardItem(index:Int)=clipboardItems.getOrNull(index)
     fun showSwipeAlternatives(items:List<String>) { suggestions=items.take(3); invalidate() }
     fun isEmojiMode() = emojiMode
     override fun onMeasure(w: Int, h: Int) {
         val width = MeasureSpec.getSize(w)
-        setMeasuredDimension(width, (4*rowHeight+barHeight).toInt() + (12*density).toInt())
+        val rows=4+(if(numberRowEnabled() && !numeric && !symbols && !emojiMode && !clipboardMode && !dictionaryMode) 1 else 0)
+        setMeasuredDimension(width, (rows*rowHeight+barHeight+accessoryHeight).toInt() + (12*density).toInt())
     }
     override fun onSizeChanged(w:Int,h:Int,oldw:Int,oldh:Int) { super.onSizeChanged(w,h,oldw,oldh); rebuild(w) }
     private fun rebuild(w:Int) {
         if(w<=0)return
         keys.clear()
-        val rows = if(clipboardMode) listOf(
+        val rows = if(dictionaryMode) listOf(
+            listOf("PERSONAL DICTIONARY"),listOf("ADD WORD"),listOf("CLEAR LEARNED"),listOf("ABC")
+        ) else if(clipboardMode) listOf(
             (0..2).map { "CLIP:$it" },
             (3..5).map { "CLIP:$it" },
             (6..8).map { "CLIP:$it" },
@@ -138,7 +146,8 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         } else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
         else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC","😊","📋","🌐","space",".","↵"))
         else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123","😊","📋","🌐","space",".","↵"))
-        rows.forEachIndexed { row, items ->
+        val finalRows=if(numberRowEnabled() && !numeric && !symbols && !emojiMode && !clipboardMode && !dictionaryMode) listOf(listOf("1","2","3","4","5","6","7","8","9","0"))+rows else rows
+        finalRows.forEachIndexed { row, items ->
             val weights=items.map { when(it) { "space"->4.0f; "⇧","⌫","?123","ABC","↵","PASTE","CLEAR"->1.45f; "🌐","😊","📋"->1.1f; else->1f } }
             val total=weights.sum().coerceAtLeast(1f)
             val hand=prefs.getString("one_hand","Off") ?: "Off"
@@ -147,12 +156,12 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             val origin=if(hand=="Right") w-margin-usable else margin
             val unit=usable/total
             var x=origin
-            if(row==1 && !symbols && !numeric && !emojiMode && !clipboardMode) {
+            if(row==(if(numberRowEnabled()) 2 else 1) && !symbols && !numeric && !emojiMode && !clipboardMode && !dictionaryMode) {
                 val natural=usable/10f*9f
                 x+=(usable-natural)/2
             }
             items.forEachIndexed { i, t ->
-                val width= if(row==1 && !symbols && !numeric && !emojiMode && !clipboardMode) usable/10f else weights[i]*unit
+                val width= if(row==(if(numberRowEnabled()) 2 else 1) && !symbols && !numeric && !emojiMode && !clipboardMode && !dictionaryMode) usable/10f else weights[i]*unit
                 val y=barHeight+row*rowHeight+margin
                 keys.add(Key(t,RectF(x+margin,y,x+width-margin,y+rowHeight-2*margin)))
                 x+=width
@@ -160,7 +169,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
         }
     }
     override fun onDraw(c:Canvas) {
-        c.drawColor(if(dark) Color.rgb(42,44,49) else Color.rgb(208,211,219))
+        c.drawColor(if(dark) Color.rgb(42,44,49) else Color.rgb(220,224,230))
         paint.color=if(dark) Color.rgb(48,50,55) else Color.rgb(224,227,234)
         c.drawRect(0f,0f,width.toFloat(),barHeight,paint)
         paint.color=Color.rgb(230,230,230) // 90% gray (#E6E6E6)
@@ -172,7 +181,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.textSize=13f*density
             paint.textAlign=Paint.Align.CENTER
             c.drawText("Clipboard: "+clipboardPreview.take(32),width/2f,(barHeight-resizeHandleHeight)/2f-(paint.ascent()+paint.descent())/2f,paint)
-        } else if(suggestions.isNotEmpty()) {
+        } else if(showPredictionBar() && showPredictionBar() && suggestions.isNotEmpty()) {
             suggestions.forEachIndexed { index, word ->
                 val left=index*width/3f
                 paint.color=if(dark) Color.WHITE else Color.rgb(26,30,40)
@@ -187,13 +196,24 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             }
         }
         c.restore()
+        // iOS-inspired lower accessory row: emoji, clipboard, dictionary and globe.
+        val accessoryY=height-accessoryHeight+4f*density
+        val accessories=listOf("😊","📋","📖","🌐")
+        paint.color=if(dark) Color.WHITE else Color.rgb(35,38,44)
+        paint.textAlign=Paint.Align.CENTER
+        paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
+        paint.textSize=23f*density
+        accessories.forEachIndexed { i, symbol ->
+            val center=width*(i+0.5f)/4f
+            c.drawText(symbol,center,accessoryY+24f*density,paint)
+        }
         keys.forEach { key ->
             val special=key.text in listOf("⇧","⌫","?123","ABC","↵","🌐","◀","▶","PASTE","SAVE","DELETE CLIP","CLEAR ALL")
             val color=when {
                 pressed===key -> accent()
                 dark && special -> Color.rgb(85,88,95)
                 dark -> Color.rgb(66,69,76)
-                special -> Color.rgb(171,177,188)
+                special -> Color.rgb(174,180,191)
                 else -> Color.WHITE
             }
             paint.color=color
@@ -202,8 +222,8 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             paint.clearShadowLayer()
             paint.color=if(pressed===key) Color.WHITE else if(dark) Color.WHITE else Color.rgb(23,25,31)
             paint.textAlign=Paint.Align.CENTER
-            paint.typeface=Typeface.create("sans-serif",Typeface.NORMAL)
-            paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 23)*density
+            paint.typeface=Typeface.create("sans-serif-light",Typeface.NORMAL)
+            paint.textSize=(if(key.text=="space") 13 else if(key.text.startsWith("CLIP:")) 12 else if(key.text.length>2) 12 else if(key.text.length>1) 19 else 25)*density
             val text=if(clipboardMode && key.text.startsWith("CLIP:")) {
                 val index=key.text.substringAfter(":").toIntOrNull() ?: -1
                 clipboardItems.getOrNull(index)?.replace("\n"," ")?.take(12) ?: "—"
@@ -250,6 +270,11 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     resizing=true; resizeStartY=event.rawY
                     resizeStartHeight=prefs.getInt("key_height",53).coerceIn(38,90)
                     cancelPendingLongPress(); return true
+                }
+                if(event.y>height-accessoryHeight) {
+                    val index=(event.x/(width/4f)).toInt().coerceIn(0,3)
+                    onKey(listOf("😊","📋","📖","🌐")[index])
+                    return true
                 }
                 downX=event.x; downY=event.y; previousSwipeX=event.x; previousSwipeY=event.y; spaceDrag=false; cursorSteps=0
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
@@ -312,12 +337,13 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 if(swipeActive && !spaceDrag) {
                     addSwipePoint(event.x,event.y)
-                    val decoded=SwipeDecoder.decode(swipeLetters.toString())
+                    val rawSwipe=swipeLetters.toString()
+                    val decoded=SwipeDecoder.decode(rawSwipe)
                     val alternatives=SwipeDecoder.alternatives(swipeLetters.toString())
                     swipeActive=false; swipePoints.clear(); swipeLetters.clear(); pressed=null
                     invalidate()
                     if(decoded!=null) { onKey("SWIPE_WORD:"+decoded); if(alternatives.size>1) setSuggestions(alternatives) }
-                    else if(swipeLetters.isNotEmpty()) onKey("SWIPE_WORD:"+swipeLetters.toString())
+                    else if(rawSwipe.isNotEmpty()) onKey("SWIPE_WORD:"+rawSwipe)
                     performClick()
                     return true
                 }
