@@ -154,7 +154,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             val page=allEmojis.drop(start).take(30)
             listOf(page.take(10),page.drop(10).take(10),page.drop(20).take(10),
                 listOf("ABC","◀","▶","⌫","space","↵"))
-        } else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
+        } else if(numeric) listOf(listOf("+","1","2","3","%"),listOf("=","4","5","6","-"),listOf(",","7","8","9","⌫"),listOf("ABC","#+=","0",".","↵"))
         else if(symbols && symbolPage==1) listOf(
             listOf("~","\u0060","|","•","√","∏","÷","×","¶","∆"),
             listOf("£","€","¥","$","^","°","=","{","}","\\"),
