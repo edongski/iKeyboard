@@ -12,6 +12,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private val keys = mutableListOf<Key>()
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var symbols = false
+    private var symbolPage=0
     private var shift = false
     private var numeric = false
     private var dark = false
@@ -57,6 +58,16 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private var downY = 0f
     private var spaceDrag = false
     private var cursorSteps = 0
+    private var cursorVerticalSteps = 0
+    private var backspaceHeld=false
+    private var backspaceStart=0L
+    private val repeatBackspace=object:Runnable { override fun run() {
+        if(!backspaceHeld) return
+        val elapsed=android.os.SystemClock.uptimeMillis()-backspaceStart
+        onKey(if(elapsed>=2000L) "DELETE_WORD" else "⌫")
+        longPressHandler.postDelayed(this,if(elapsed>=2000L) 135L else 65L)
+    } }
+    private fun stopBackspace() { backspaceHeld=false; longPressHandler.removeCallbacks(repeatBackspace) }
     private val swipePoints = mutableListOf<PointF>()
     private val swipeLetters = StringBuilder()
     private var swipeActive = false
@@ -96,9 +107,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private val longPressTask = Runnable {
         val key=pressed?.text
         if(key=="⌫") {
-            longPressTriggered=true
-            onKey("DELETE_WORD")
-            invalidate()
+            // Backspace repeat is handled separately: letters first, words after two seconds.
         } else if(showNumberHints() && key!=null && key.length==1 && "qwertyuiop".contains(key)) {
             val index="qwertyuiop".indexOf(key)
             longPressTriggered=true
@@ -115,6 +124,7 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
     private fun showNumberHints() = prefs.getBoolean("number_hints",false)
     init { isClickable = true; setLayerType(LAYER_TYPE_SOFTWARE,null) }
     fun update(s: Boolean, sh: Boolean, n: Boolean, d: Boolean) { symbols=s; shift=sh; numeric=n; dark=d; rebuild(width); invalidate() }
+    fun nextSymbolPage() { symbolPage=(symbolPage+1)%2; rebuild(width); invalidate() }
     fun showEmoji() { emojiMode=!emojiMode; clipboardMode=false; rebuild(width); invalidate() }
     fun showLetters() { emojiMode=false; clipboardMode=false; dictionaryMode=false; rebuild(width); invalidate() }
     fun showDictionary() { dictionaryMode=!dictionaryMode; emojiMode=false; clipboardMode=false; rebuild(width); invalidate() }
@@ -145,7 +155,17 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
             listOf(page.take(10),page.drop(10).take(10),page.drop(20).take(10),
                 listOf("ABC","◀","▶","⌫","space","↵"))
         } else if(numeric) listOf(listOf("1","2","3"),listOf("4","5","6"),listOf("7","8","9"),listOf("ABC","0","⌫","↵"))
-        else if(symbols) listOf(listOf("1","2","3","4","5","6","7","8","9","0"),listOf("@","#","$","%","&","-","+","(",")","/"),listOf("*","\" ",":",";","!","?","'","⌫"),listOf("ABC",",","space",".","↵"))
+        else if(symbols && symbolPage==1) listOf(
+            listOf("~","\u0060","|","•","√","∏","÷","×","¶","∆"),
+            listOf("£","€","¥","$","^","°","=","{","}","\\"),
+            listOf("123","%","©","®","™","‰","[","]","⌫"),
+            listOf("ABC","<",">","space",".","↵")
+        ) else if(symbols) listOf(
+            listOf("1","2","3","4","5","6","7","8","9","0"),
+            listOf("@","#","₱","_","&","-","+","(",")","/"),
+            listOf("#+=","*","\"","'",":",";","!","?","⌫"),
+            listOf("ABC",",","space",".","↵")
+        )
         else listOf("qwertyuiop".map{it.toString()},"asdfghjkl".map{it.toString()},listOf("⇧")+"zxcvbnm".map{it.toString()}+"⌫",listOf("?123",",","space",".","↵"))
         val finalRows=if(numberRowEnabled() && !numeric && !symbols && !emojiMode && !clipboardMode && !dictionaryMode) listOf(listOf("1","2","3","4","5","6","7","8","9","0"))+rows else rows
         finalRows.forEachIndexed { row, items ->
@@ -323,11 +343,15 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                     onKey(listOf("😊","📋","📖","🌐")[index])
                     return true
                 }
-                downX=event.x; downY=event.y; previousSwipeX=event.x; previousSwipeY=event.y; spaceDrag=false; cursorSteps=0
+                downX=event.x; downY=event.y; previousSwipeX=event.x; previousSwipeY=event.y; spaceDrag=false; cursorSteps=0; cursorVerticalSteps=0
                 swipeActive=false; swipePoints.clear(); swipeLetters.clear()
                 if(swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode) addSwipePoint(event.x,event.y)
                 pressed=smartHit(event.x,event.y)
                 downKey=pressed
+                if(downKey?.text=="⌫") {
+                    backspaceHeld=true; backspaceStart=android.os.SystemClock.uptimeMillis()
+                    longPressHandler.postDelayed(repeatBackspace,430L)
+                }
                 longPressTriggered=false
                 cancelPendingLongPress()
                 if(pressed!=null) longPressHandler.postDelayed(longPressTask,550L)
@@ -345,13 +369,18 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 if(hypot(event.x-downX,event.y-downY)>12f*density) cancelPendingLongPress()
                 if(longPressTriggered) return true
-                if(downKey?.text=="space" && abs(event.x-downX)>14f*density) {
+                if(downKey?.text=="space" && (abs(event.x-downX)>14f*density || abs(event.y-downY)>14f*density)) {
                     spaceDrag=true
                     val target=((event.x-downX)/(23f*density)).toInt()
                     val delta=(target-cursorSteps).coerceIn(-20,20)
                     if(delta>0) onKey("CURSOR_RIGHT:" + delta)
                     if(delta<0) onKey("CURSOR_LEFT:" + (-delta))
                     cursorSteps+=delta
+                    val verticalTarget=((event.y-downY)/(26f*density)).toInt()
+                    val verticalDelta=(verticalTarget-cursorVerticalSteps).coerceIn(-12,12)
+                    if(verticalDelta>0) onKey("CURSOR_DOWN:"+verticalDelta)
+                    if(verticalDelta<0) onKey("CURSOR_UP:"+(-verticalDelta))
+                    cursorVerticalSteps+=verticalDelta
                 } else if(!spaceDrag && swipeEnabled() && !symbols && !numeric && !emojiMode && !clipboardMode &&
                     downKey?.text?.length==1 && downKey?.text?.firstOrNull() in 'a'..'z' &&
                     hypot(event.x-downX,event.y-downY)>22f*density) {
@@ -378,6 +407,9 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 invalidate(); return true
             }
             MotionEvent.ACTION_UP -> {
+                val heldBackspace=backspaceHeld
+                stopBackspace()
+                if(heldBackspace && android.os.SystemClock.uptimeMillis()-backspaceStart>=430L) { pressed=null; invalidate(); performClick(); return true }
                 if(accessoryHandled) { accessoryHandled=false; performClick(); return true }
                 if(resizing) { resizing=false; performClick(); return true }
                 cancelPendingLongPress()
@@ -418,10 +450,10 @@ class IKeyView(context: Context, private val onKey: (String) -> Unit) : View(con
                 }
                 performClick(); return true
             }
-            MotionEvent.ACTION_CANCEL -> { accessoryHandled=false; resizing=false; cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
+            MotionEvent.ACTION_CANCEL -> { stopBackspace(); accessoryHandled=false; resizing=false; cancelPendingLongPress(); longPressTriggered=false; pressed=null; spaceDrag=false; swipeActive=false; swipePoints.clear(); swipeLetters.clear(); invalidate(); return true }
         }
         return true
     }
-    override fun onDetachedFromWindow() { cancelPendingLongPress(); super.onDetachedFromWindow() }
+    override fun onDetachedFromWindow() { stopBackspace(); cancelPendingLongPress(); super.onDetachedFromWindow() }
     override fun performClick():Boolean { super.performClick(); return true }
 }
