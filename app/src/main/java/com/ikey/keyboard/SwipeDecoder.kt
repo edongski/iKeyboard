@@ -10,7 +10,7 @@ import kotlin.math.abs
 object SwipeDecoder {
     private val words by lazy { WordSuggestions.vocabulary.filter { it.length in 2..24 && it.all { ch -> ch in 'a'..'z' } } }
     private val indexed by lazy { words.groupBy { it.first() to it.last() } }
-    private val lastPath = ThreadLocal<String>()
+
     private fun compact(s: String): String {
         val out=StringBuilder()
         for(c in s.lowercase()) if(c in 'a'..'z' && (out.isEmpty() || out.last()!=c)) out.append(c)
@@ -34,7 +34,8 @@ object SwipeDecoder {
     private fun ranked(raw:String, learned:Collection<String>):List<Pair<String,Int>> {
         val path=compact(raw)
         if(path.length<2) return emptyList()
-        val pool=indexed[path.first() to path.last()].orEmpty() +
+        val exact=indexed[path.first() to path.last()].orEmpty()
+        val pool=(if(exact.isNotEmpty()) exact else words.filter { it.first()==path.first() }) +
             learned.filter { it.length>=2 && it.firstOrNull()==path.first() && it.lastOrNull()==path.last() }
         return pool.asSequence().distinct().filter { abs(compact(it).length-path.length)<=maxOf(5,path.length/2) }
             .map { word ->
@@ -44,7 +45,8 @@ object SwipeDecoder {
                     if(index<path.length && path.indexOf(ch,index)>=0) path.indexOf(ch,index)+1 else index
                 }
                 val penalty=if(subsequence==0) 2 else 0
-                word to (edit*3+abs(shape.length-path.length)+penalty)
+                val endPenalty=if(word.last()==path.last()) 0 else 4
+                word to (edit*3+abs(shape.length-path.length)+penalty+endPenalty)
             }.sortedWith(compareBy<Pair<String,Int>> { it.second }.thenBy { it.first.length })
             .take(3).toList()
     }
